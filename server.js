@@ -80,6 +80,8 @@ io.on('connection', socket => {
     const room = rooms.get(code);
     if (!room) return socket.emit('room:error', { message: '방을 찾을 수 없습니다. 초대 코드를 확인해 주세요.' });
     if (room.started) return socket.emit('room:error', { message: '이미 시작한 방에는 입장할 수 없습니다.' });
+    if (socketRoom.get(socket.id) === code) { publishRoomState(room); return; }
+    if (room.players.size >= MAX_ROOM_PLAYERS) return socket.emit('room:error', { message: `이 방은 최대 ${MAX_ROOM_PLAYERS}명까지 입장할 수 있습니다.` });
     leave(socket);
     enter(socket, room, data?.nickname);
   });
