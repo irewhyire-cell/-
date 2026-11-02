@@ -1357,6 +1357,7 @@
         })();
         let currentOnlineRoom = null;
         let waitingRoomPracticeActive = false;
+        let onlineGameStarted = false;
         function updateOnlineWaitingBanner(data = currentOnlineRoom) {
             const banner = document.getElementById('online-waiting-banner');
             const codeEl = document.getElementById('online-waiting-room-code');
@@ -1387,7 +1388,12 @@
             const count = onlineRoomMembers.length;
             const max = data.maxPlayers || 7;
             if (membersEl) membersEl.textContent = count ? onlineRoomMembers.map((p, i) => `${i + 1}. ${p.name || '아쿠아영웅'}${p.id === onlineSocket?.id ? ' (나)' : ''}${p.id === data.hostId ? ' 👑' : ''}`).join(' · ') : '참가자를 기다리는 중입니다.';
-            if (waitingEl) waitingEl.textContent = data.started ? '경기가 진행 중입니다.' : (count < 2 ? `현재 ${count}/${max}명 · 보스 연습 중입니다. 참가자가 들어오면 자동 시작합니다.` : `${count}/${max}명 입장 · 온라인 경기로 이동합니다.`);
+            if (waitingEl) {
+                if (data.started) waitingEl.textContent = '온라인 경기가 진행 중입니다.';
+                else if (count < 2 && onlineIsHost) waitingEl.textContent = `현재 ${count}/${max}명 · 보스 연습 중입니다. 플레이어가 입장하면 자동 시작합니다.`;
+                else if (count < 2) waitingEl.textContent = `플레이어로 입장했습니다 · 방장이 보스 연습 중입니다. 다른 참가자가 들어오면 자동 시작합니다. (${count}/${max}명)`;
+                else waitingEl.textContent = `${count}/${max}명 입장 · 온라인 경기를 시작합니다.`;
+            }
             if (startBtn) {
                 startBtn.disabled = true;
                 startBtn.textContent = data.started ? '온라인 경기 진행 중' : '참가자 입장 시 자동 시작';
@@ -1413,6 +1419,7 @@
                 renderRoomState(data);
                 renderOnlineRooms(data.rooms||[]);
                 if (data.isHost && !data.started) {
+                    onlineGameStarted = false;
                     waitingRoomPracticeActive = true;
                     const requestedStage = Number.isInteger(data.stageIndex) ? Math.max(0, Math.min(1100, data.stageIndex)) : 0;
                     const requestedStageNumber = 100 - requestedStage;
@@ -1421,11 +1428,29 @@
                     document.getElementById('online-modal').classList.add('hidden');
                     startStage(practiceStageIndex, 'boss');
                     updateOnlineWaitingBanner(data);
-                    showToast(`방 ${data.code} 생성 완료! 보스 ${practiceStageNumber} 연습 중 · 참가자가 들어오면 온라인 경기가 시작됩니다.`);
+                    showToast(`방 ${data.code} 생성 완료! 보스 ${practiceStageNumber} 연습 중 · 플레이어 입장을 기다립니다.`);
+                } else if (!data.isHost && !data.started) {
+                    // 일반 참가자도 방에 정상 입장하고, 자동 시작 신호를 기다립니다.
+                    onlineGameStarted = false;
+                    waitingRoomPracticeActive = false;
+                    document.getElementById('online-modal').classList.remove('hidden');
+                    setOnlineStatus(`플레이어로 입장했습니다 · 방 ${data.code} · ${onlineRoomMembers.length}/7명 · 참가자가 모이면 온라인 경기가 자동 시작됩니다.`);
+                    showToast(`${data.name || '온라인 방'}에 플레이어로 입장했습니다!`);
+                } else if (!data.isHost && data.started) {
+                    // 이미 진행 중인 경기에도 플레이어로 참가할 수 있습니다.
+                    waitingRoomPracticeActive = false;
+                    setOnlineStatus(`진행 중인 온라인 경기 ${data.code}에 플레이어로 참가했습니다.`);
+                    showToast('진행 중인 온라인 경기에 참가했습니다!');
                 }
             });
-            onlineSocket.on('room:state',renderRoomState);
-            onlineSocket.on('room:error',data=>setOnlineStatus(data.message||'온라인 방 오류'));
+            onlineSocket.on('room:state', data => {
+                if (data?.started) onlineGameStarted = true;
+                renderRoomState(data);
+            });
+            onlineSocket.on('room:error',data=>{
+                setOnlineStatus(data.message||'온라인 방 오류');
+                showToast(data.message||'온라인 방 입장에 실패했습니다.');
+            });
             onlineSocket.on('room:member-joined',member=>{setOnlineStatus(`${member.name} 님이 입장했습니다.`); onlineSocket.emit('rooms:list');});
             onlineSocket.on('room:member-left',data=>{remotePlayers.delete(data.id);setOnlineStatus('참가자가 방을 나갔습니다.');onlineSocket.emit('rooms:list');});
             onlineSocket.on('game:state',state=>{
@@ -1434,6 +1459,7 @@
             });
             onlineSocket.on('game:start',data=>{
                 const idx=Number.isInteger(data.stageIndex)?Math.max(0,Math.min(1100,data.stageIndex)):0;
+                onlineGameStarted = true;
                 waitingRoomPracticeActive = false;
                 updateOnlineWaitingBanner({ ...(currentOnlineRoom || {}), started: true });
                 document.getElementById('online-modal').classList.add('hidden');
@@ -1454,8 +1480,9 @@
             rooms.forEach(room=>{
                 const row=document.createElement('div');row.className='flex items-center justify-between gap-2 rounded-xl bg-slate-900 border border-slate-700 p-3';
                 const info=document.createElement('div');const title=document.createElement('b');title.className='text-cyan-200';title.textContent=room.name||'아쿠아 방';
-                const meta=document.createElement('div');meta.className='text-slate-400 mt-1';meta.textContent=`보스 연습 대기 중 · ${room.players}/${room.maxPlayers || 7}명 · 스테이지 ${room.stageNumber ?? '선택'}`;
-                info.append(title,meta);const join=document.createElement('button');join.className='liquid-btn px-3 py-2 rounded-lg font-black';join.textContent='입장';join.disabled=room.players >= (room.maxPlayers || 7) || !!room.started;
+                const meta=document.createElement('div');meta.className='text-slate-400 mt-1';meta.textContent=`${room.started ? '온라인 경기 진행 중 · 중간 참가 가능' : '보스 연습 대기 중 · 참가 가능'} · ${room.players}/${room.maxPlayers || 7}명 · 스테이지 ${room.stageNumber ?? '선택'}`;
+                info.append(title,meta);const join=document.createElement('button');join.className='liquid-btn px-3 py-2 rounded-lg font-black';join.textContent=room.started ? '경기 참가' : '플레이어로 입장';join.disabled=room.players >= (room.maxPlayers || 7);
+                join.setAttribute('aria-label', `${room.name || '아쿠아 방'}에 플레이어로 입장`);
                 join.addEventListener('click',()=>joinRoom(room.code));row.append(info,join);list.appendChild(row);
             });
         }
@@ -1471,13 +1498,16 @@
             onlineSocket.emit('room:create',{name:`${nick}의 방`,nickname:nick,stageIndex:100-stageNumber,isPublic});
         }
         function joinRoom(code){
-            if(!onlineSocket||!onlineSocket.connected){setOnlineStatus('온라인 서버 연결이 필요합니다.');connectOnline();return;}
-            code=String(code||'').trim().toUpperCase();if(!code){setOnlineStatus('방 코드를 입력하세요.');return;}
+            if(!onlineSocket||!onlineSocket.connected){setOnlineStatus('온라인 서버 연결이 필요합니다. 잠시 후 다시 입장해 주세요.');connectOnline();return;}
+            code=String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
+            if(!code){setOnlineStatus('방 코드를 입력하세요.');return;}
             const nick=(document.getElementById('player-nickname-input').value||'아쿠아영웅').trim().slice(0,12);
+            setOnlineStatus(`방 ${code}에 플레이어로 입장하는 중입니다...`);
             onlineSocket.emit('room:join',{code,nickname:nick});
         }
         function leaveOnlineRoom(){
             if(onlineSocket&&onlineRoomCode) onlineSocket.emit('room:leave');
+            onlineGameStarted = false;
             waitingRoomPracticeActive = false;
             document.getElementById('online-waiting-banner')?.classList.add('hidden');
             currentOnlineRoom=null;onlineRoomCode=null;onlineIsHost=false;onlineRoomMembers=[];remotePlayers.clear();
@@ -1488,7 +1518,7 @@
             setOnlineStatus('방에서 나왔습니다.');
         }
         function sendOnlineState(){
-            if(!onlineSocket||!onlineSocket.connected||!onlineRoomCode||!player||!isGameRunning)return;
+            if(!onlineGameStarted||!onlineSocket||!onlineSocket.connected||!onlineRoomCode||!player||!isGameRunning)return;
             const now=performance.now();if(now-lastNetworkSend<50)return;lastNetworkSend=now;
             onlineSocket.emit('game:state',{x:player.x/canvas.width,y:player.y/canvas.height,radius:player.radius,name:player.name,color:player.color,landColor:player.landColor,stageIndex:currentSeqIdx});
         }
