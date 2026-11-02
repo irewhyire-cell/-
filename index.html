@@ -56,8 +56,16 @@
             animation: waterPulse 2.5s infinite ease-in-out;
         }
         #virtual-joystick-container { touch-action: none; user-select: none; }
+        #virtual-joystick-container, #btn-blast, #btn-rush {
+            touch-action: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-touch-callout: none;
+            -webkit-tap-highlight-color: transparent;
+        }
+        button, input, select { -webkit-tap-highlight-color: transparent; }
+        button { touch-action: manipulation; }
         canvas { outline: 1px solid rgba(125,211,252,.18); }
-        button { -webkit-tap-highlight-color: transparent; }
         .glass-panel { box-shadow: 0 12px 40px rgba(2, 8, 23, .28), inset 0 1px 0 rgba(255,255,255,.05); }
         .game-overlay { position:absolute; inset:0; z-index:35; display:flex; align-items:center; justify-content:center; background:rgba(2,6,23,.82); backdrop-filter:blur(10px); padding:1rem; }
         .game-overlay.hidden { display:none; }
@@ -159,6 +167,23 @@
                 max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px) !important;
                 padding: 10px !important;
                 border-radius: 14px;
+            }
+        }
+
+        /* iPhone / iPad Safari touch and safe-area tuning */
+        @supports (-webkit-touch-callout: none) {
+            html { min-height: -webkit-fill-available; }
+            body { min-height: -webkit-fill-available; }
+        }
+        @media (max-width: 760px) {
+            #hud { top: max(5px, env(safe-area-inset-top)); }
+            #virtual-joystick-container { width: 100px !important; height: 100px !important; }
+            #virtual-joystick-container > div { width: 46px !important; height: 46px !important; }
+            #btn-blast, #btn-rush {
+                min-width: 66px;
+                min-height: 52px;
+                padding: 12px 10px !important;
+                touch-action: none;
             }
         }
 
@@ -656,6 +681,7 @@
         const joystickContainer = document.getElementById('virtual-joystick-container');
         const joystickStick = document.getElementById('joystick-stick');
         let joystickActive = false;
+        let joystickTouchIdentifier = null;
         let joystickVector = { x: 0, y: 0 };
 
         function handleJoystickMove(clientX, clientY) {
@@ -679,20 +705,57 @@
             joystickVector = { x: 0, y: 0 };
         }
 
-        joystickContainer.addEventListener('touchstart', (e) => { joystickActive = true; if (e.touches.length > 0) handleJoystickMove(e.touches[0].clientX, e.touches[0].clientY); });
-        window.addEventListener('touchmove', (e) => { if (joystickActive && e.touches.length > 0) handleJoystickMove(e.touches[0].clientX, e.touches[0].clientY); });
-        window.addEventListener('touchend', resetJoystick);
+        // iOS Safari: track only the finger that started on the joystick.
+        // Releasing a second finger on an action button must not cancel movement.
+        joystickContainer.addEventListener('touchstart', (e) => {
+            if (joystickTouchIdentifier !== null) return;
+            const touch = e.changedTouches && e.changedTouches.length
+                ? e.changedTouches[0]
+                : (e.touches && e.touches.length ? e.touches[0] : null);
+            if (!touch) return;
+            e.preventDefault();
+            joystickActive = true;
+            joystickTouchIdentifier = touch.identifier;
+            handleJoystickMove(touch.clientX, touch.clientY);
+        }, { passive: false });
+        window.addEventListener('touchmove', (e) => {
+            if (joystickTouchIdentifier === null) return;
+            for (let i = 0; i < e.touches.length; i++) {
+                const touch = e.touches[i];
+                if (touch.identifier === joystickTouchIdentifier) {
+                    e.preventDefault();
+                    handleJoystickMove(touch.clientX, touch.clientY);
+                    break;
+                }
+            }
+        }, { passive: false });
+        function finishJoystickTouch(e) {
+            if (joystickTouchIdentifier === null) return;
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joystickTouchIdentifier) {
+                    joystickTouchIdentifier = null;
+                    resetJoystick();
+                    break;
+                }
+            }
+        }
+        window.addEventListener('touchend', finishJoystickTouch, { passive: false });
+        window.addEventListener('touchcancel', finishJoystickTouch, { passive: false });
         joystickContainer.addEventListener('mousedown', (e) => { joystickActive = true; handleJoystickMove(e.clientX, e.clientY); });
         window.addEventListener('mousemove', (e) => { if (joystickActive) handleJoystickMove(e.clientX, e.clientY); });
         window.addEventListener('mouseup', resetJoystick);
 
         function initCanvasSize() {
-            const size = Math.max(240, Math.min(window.innerWidth - 32, window.innerHeight - 165, 750));
+            const viewportWidth = window.visualViewport?.width || window.innerWidth;
+            const viewportHeight = window.visualViewport?.height || window.innerHeight;
+            const size = Math.max(240, Math.min(viewportWidth - 32, viewportHeight - 165, 750));
             canvas.width = size;
             canvas.height = size;
             cellSize = canvas.width / COLS;
         }
         window.addEventListener('resize', initCanvasSize);
+        if (window.visualViewport) window.visualViewport.addEventListener('resize', initCanvasSize);
+        window.addEventListener('orientationchange', () => setTimeout(initCanvasSize, 180));
         initCanvasSize();
 
         class WaterEntity {
