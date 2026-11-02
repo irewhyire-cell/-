@@ -9,13 +9,16 @@ const io = new Server(server, { cors: { origin: true, methods: ['GET', 'POST'] }
 const PORT = process.env.PORT || 3000;
 const rooms = new Map();
 const socketRoom = new Map();
+const MAX_ROOM_PLAYERS = 7;
 
 app.get('/health', (_req, res) => res.json({ ok: true, service: 'AQUA WARS', rooms: rooms.size }));
 app.use(express.static(path.join(__dirname)));
 app.get('*', (_req, res) => res.sendFile(path.join(__dirname, 'index.html')));
 
 function roomList() {
-  return [...rooms.values()].map(r => ({ code: r.code, name: r.name, players: r.players.size, stageIndex: r.stageIndex }));
+  // 비공개 방의 코드가 전체 목록에 노출되지 않도록 공개 목록은 비웁니다.
+  // 참가자는 방장이 전달한 초대 코드로만 입장할 수 있습니다.
+  return [];
 }
 function publishRooms() { io.emit('rooms:update', roomList()); }
 function leave(socket) {
@@ -38,16 +41,16 @@ function leave(socket) {
 function makeCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   let code;
-  do { code = Array.from({ length: 5 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''); }
+  do { code = Array.from({ length: 8 }, () => chars[Math.floor(Math.random() * chars.length)]).join(''); }
   while (rooms.has(code));
   return code;
 }
 function enter(socket, room, nickname) {
-  if (room.players.size >= 1) return socket.emit('room:error', { message: '이 방은 최대 1명까지 입장할 수 있습니다.' });
+  if (room.players.size >= MAX_ROOM_PLAYERS) return socket.emit('room:error', { message: `이 방은 최대 ${MAX_ROOM_PLAYERS}명까지 입장할 수 있습니다.` });
   room.players.set(socket.id, { id: socket.id, name: String(nickname || '아쿠아영웅').slice(0, 12) });
   socketRoom.set(socket.id, room.code);
   socket.join(room.code);
-  socket.emit('room:joined', { code: room.code, name: room.name, isHost: room.hostId === socket.id, players: [...room.players.values()], rooms: roomList() });
+  socket.emit('room:joined', { code: room.code, name: room.name, isHost: room.hostId === socket.id, players: [...room.players.values()], maxPlayers: MAX_ROOM_PLAYERS, rooms: roomList() });
   socket.to(room.code).emit('room:member-joined', { id: socket.id, name: String(nickname || '아쿠아영웅').slice(0, 12) });
   publishRooms();
 }
