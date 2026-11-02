@@ -217,6 +217,20 @@
             <div class="rounded-xl bg-slate-900 border border-cyan-500/30 p-3 text-xs text-cyan-100 leading-relaxed">
                 <span id="online-connection-status">서버 연결 확인 중...</span><br>비공개 방입니다. 초대 코드가 있는 지인만 참여할 수 있으며, 방당 최대 7명까지 입장할 수 있습니다.
             </div>
+            <div class="rounded-xl bg-slate-900/80 border border-slate-700 p-3 space-y-2">
+                <label class="flex items-center gap-2 text-xs font-bold text-cyan-100"><input id="room-public-toggle" type="checkbox" class="accent-cyan-400 w-4 h-4"> 공개 방으로 표시 (다른 사람의 공개 방 목록에 보이기)</label>
+                <p class="text-[10px] text-slate-500">끄면 비공개 방으로 만들어지고, 8자리 초대 코드를 받은 사람만 입장할 수 있습니다.</p>
+            </div>
+            <div class="rounded-xl bg-slate-900/80 border border-slate-700 p-3 space-y-2">
+                <label for="online-stage-number" class="block text-xs font-bold text-cyan-200">온라인 시작 스테이지 (100 ~ -1000)</label>
+                <input id="online-stage-number" type="number" min="-1000" max="100" step="1" value="100" class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm">
+                <p class="text-[10px] text-slate-500">온라인은 100부터 -1000까지 선택할 수 있으며, 음수 스테이지로 갈수록 난이도가 조금씩 올라갑니다.</p>
+            </div>
+            <div class="rounded-xl bg-slate-900/80 border border-slate-700 p-3 space-y-1">
+                <div class="text-xs font-bold text-cyan-200">현재 방 참가자</div>
+                <div id="online-room-members" class="text-xs text-slate-300">아직 방에 입장하지 않았습니다.</div>
+                <div id="online-room-waiting" class="text-[10px] text-amber-200">2명 이상 모이면 방장이 경기를 시작할 수 있습니다.</div>
+            </div>
             <div class="grid grid-cols-2 gap-2">
                 <button id="btn-create-room" class="liquid-btn rounded-xl p-3 font-black text-sm">＋ 방 만들기</button>
                 <button id="btn-refresh-rooms" class="glass-panel rounded-xl p-3 font-bold text-sm text-cyan-200 border border-cyan-500/30">↻ 방 새로고침</button>
@@ -402,7 +416,7 @@
         const ROWS = 70;
         const TARGET_PERCENT = 40.0;
 
-        const LEVEL_CONFIGS = Array.from({ length: 101 }, (_, i) => {
+        const LEVEL_CONFIGS = Array.from({ length: 1101 }, (_, i) => {
             const stageNum = 100 - i;
             const isBossStage = (stageNum % 10 === 0);
             const isZeroStage = (stageNum === 0);
@@ -414,7 +428,7 @@
                 name: isZeroStage ? `🏆 Stage 0` : (isBossStage ? `👑 Stage ${stageNum}` : `Stage ${stageNum}`),
                 color: isZeroStage ? '#f59e0b' : (isBossStage ? '#ef4444' : '#2563eb'),
                 landColor: isZeroStage ? '#d97706' : (isBossStage ? '#b91c1c' : '#1d4ed8'),
-                speedMult: 0.58 + (i * 0.0135),
+                speedMult: i <= 100 ? (0.58 + (i * 0.0135)) : (1.93 + ((i - 100) * 0.0012)),
                 reward: 100
             };
         });
@@ -904,8 +918,7 @@
             const speedBtn = document.getElementById('buy-speed-up');
             if (speedBtn) { speedBtn.disabled = speedBoostMult >= 2.5; speedBtn.innerHTML = speedBoostMult >= 2.5 ? '최대 레벨' : `<span id="price-speed-up">${prices.speedUp}</span> 코인`; }
             const onlineBtn = document.getElementById('btn-online-entry');
-            const onlineUnlocked = completedStages.includes(100);
-            if (onlineBtn) { onlineBtn.disabled = !onlineUnlocked; onlineBtn.innerHTML = onlineUnlocked ? '<i class="fa-solid fa-earth-asia"></i> 온라인 입장' : '<i class="fa-solid fa-lock"></i> 온라인 입장 (0단계 클리어 후 해금)'; }
+            if (onlineBtn) { onlineBtn.disabled = false; onlineBtn.innerHTML = '<i class="fa-solid fa-earth-asia"></i> 친구와 온라인 입장'; }
             refreshStartStageSelect();
         }
         function refreshStartStageSelect() {
@@ -913,7 +926,7 @@
             if (!select || !Array.isArray(LEVEL_CONFIGS)) return;
             const previous = Number(select.value || 0);
             select.innerHTML = '';
-            LEVEL_CONFIGS.forEach((cfg, idx) => {
+            LEVEL_CONFIGS.slice(0, 101).forEach((cfg, idx) => {
                 const opt = document.createElement('option');
                 opt.value = String(idx);
                 opt.textContent = `${cfg.isZeroStage ? '🏆 최종 보스 ' : (cfg.isBossStage ? '👑 보스 ' : '')}${cfg.stageNumber} 단계${completedStages.includes(idx) ? ' ✓ 클리어' : ''}`;
@@ -921,7 +934,7 @@
             });
             select.value = String(Math.max(0, Math.min(previous, LEVEL_CONFIGS.length - 1)));
             const help = document.getElementById('start-stage-help');
-            if (help) help.textContent = '처음부터 100~0단계 중 원하는 곳을 자유롭게 선택할 수 있습니다. 10단계마다 보스가 등장합니다.';
+            if (help) help.textContent = '일반 모드는 100~0단계 선택, 온라인은 100~-1000단계까지 지원합니다.';
         }
 
         function saveGame() {
@@ -1024,7 +1037,7 @@
             const gridContainer = document.getElementById('stage-grid-container');
             if (!gridContainer) return;
             gridContainer.innerHTML = '';
-            LEVEL_CONFIGS.forEach((cfg, idx) => {
+            LEVEL_CONFIGS.slice(0, 101).forEach((cfg, idx) => {
                 const btn = document.createElement('button');
                 const unlocked = true; // 시작부터 모든 스테이지 선택 가능
                 btn.className = `p-2 rounded-xl font-bold text-xs ${cfg.isZeroStage ? 'bg-amber-600 text-white' : (cfg.isBossStage ? 'bg-rose-800 text-white' : 'bg-slate-800 text-slate-200')}`;
@@ -1076,8 +1089,26 @@
             const el=document.getElementById('online-connection-status');
             if(el){el.textContent=message;el.className=good?'text-emerald-300':'text-amber-200';}
         }
+        function renderRoomState(data) {
+            if (!data) return;
+            currentOnlineRoom = data;
+            onlineIsHost = !!data.isHost;
+            onlineRoomMembers = Array.isArray(data.players) ? data.players : [];
+            const membersEl = document.getElementById('online-room-members');
+            const waitingEl = document.getElementById('online-room-waiting');
+            const startBtn = document.getElementById('btn-online-start');
+            const count = onlineRoomMembers.length;
+            const max = data.maxPlayers || 7;
+            if (membersEl) membersEl.textContent = count ? onlineRoomMembers.map((p, i) => `${i + 1}. ${p.name || '아쿠아영웅'}${p.id === onlineSocket?.id ? ' (나)' : ''}${p.id === data.hostId ? ' 👑' : ''}`).join(' · ') : '참가자를 기다리는 중입니다.';
+            if (waitingEl) waitingEl.textContent = data.started ? '경기가 진행 중입니다.' : (count < 2 ? `현재 ${count}/${max}명 · 2명 이상 입장하면 방장이 시작할 수 있습니다.` : `${count}/${max}명 입장 완료 · 방장이 시작할 수 있습니다.`);
+            if (startBtn) {
+                startBtn.disabled = !onlineIsHost || count < 2 || !!data.started;
+                startBtn.textContent = onlineIsHost ? (count < 2 ? '2명 이상 모이면 시작할 수 있습니다' : '온라인 경기 시작 (방장)') : '방장이 시작할 때까지 대기';
+            }
+            if (data.code) setOnlineStatus(`${data.isPublic ? '공개' : '비공개'} 방 ${data.code} · ${count}/${max}명${onlineIsHost ? ' · 방장' : ' · 참가자'}`);
+        }
         function connectOnline() {
-            if (typeof io !== 'function') { updateConnectionLabel('온라인 서버 라이브러리를 불러오지 못했습니다. 배포 서버에서 다시 접속해 주세요.'); return; }
+            if (typeof io !== 'function') { updateConnectionLabel('온라인 연결 도구를 불러오지 못했습니다. 배포 서버에서 다시 접속해 주세요.'); return; }
             if (onlineSocket) return;
             onlineSocket = io({transports:['websocket','polling'], reconnection:true, reconnectionAttempts:8, timeout:8000});
             onlineSocket.on('connect',()=>{updateConnectionLabel('온라인 서버 연결됨 · 다른 사람과 방을 만들 수 있습니다.',true); onlineSocket.emit('rooms:list');});
@@ -1089,12 +1120,11 @@
                 currentOnlineRoom=data; onlineRoomCode=data.code; onlineIsHost=!!data.isHost;
                 onlineRoomMembers=data.players||[]; remotePlayers.clear();
                 document.getElementById('room-code-input').value=data.code;
-                setOnlineStatus(`비공개 방 ${data.code} 입장 완료 · ${onlineRoomMembers.length}/${data.maxPlayers || 7}명 · ${onlineIsHost?'방장':'참가자'}`);
-                document.getElementById('btn-online-start').disabled=!onlineIsHost;
-                document.getElementById('btn-online-start').textContent=onlineIsHost?'온라인 경기 시작 (방장)':'방장이 경기를 시작할 때까지 기다리세요';
                 document.getElementById('btn-leave-room').disabled=false;
+                renderRoomState(data);
                 renderOnlineRooms(data.rooms||[]);
             });
+            onlineSocket.on('room:state',renderRoomState);
             onlineSocket.on('room:error',data=>setOnlineStatus(data.message||'온라인 방 오류'));
             onlineSocket.on('room:member-joined',member=>{setOnlineStatus(`${member.name} 님이 입장했습니다.`); onlineSocket.emit('rooms:list');});
             onlineSocket.on('room:member-left',data=>{remotePlayers.delete(data.id);setOnlineStatus('참가자가 방을 나갔습니다.');onlineSocket.emit('rooms:list');});
@@ -1103,20 +1133,27 @@
                 remotePlayers.set(state.id,state);
             });
             onlineSocket.on('game:start',data=>{
-                const idx=Number.isInteger(data.stageIndex)?Math.max(0,Math.min(100,data.stageIndex)):0;
+                const idx=Number.isInteger(data.stageIndex)?Math.max(0,Math.min(1100,data.stageIndex)):0;
+                document.getElementById('online-modal').classList.add('hidden');
                 if(!isGameRunning || currentSeqIdx!==idx) startStage(idx);
-                setOnlineStatus(`온라인 경기 진행 중 · 방 ${onlineRoomCode}`);
+                const spawn = data.spawns && data.spawns[onlineSocket.id];
+                if (spawn && player) {
+                    player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, Number(spawn.x) * canvas.width));
+                    player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, Number(spawn.y) * canvas.height));
+                    player.claimTerritory();
+                }
+                setOnlineStatus(`온라인 경기 시작 · ${LEVEL_CONFIGS[idx].stageNumber}단계 · 방 ${onlineRoomCode}`);
             });
         }
         function renderOnlineRooms(rooms) {
             const list=document.getElementById('room-list'); if(!list)return;
             list.innerHTML='';
-            if(!Array.isArray(rooms)||!rooms.length){list.innerHTML='<p class="text-slate-500">비공개 방은 목록에 표시되지 않습니다. 친구가 만든 방의 초대 코드를 입력해 입장하세요.</p>';return;}
+            if(!Array.isArray(rooms)||!rooms.length){list.innerHTML='<p class="text-slate-500">현재 공개된 대기 방이 없습니다. 비공개 방은 초대 코드를 입력하세요.</p>';return;}
             rooms.forEach(room=>{
                 const row=document.createElement('div');row.className='flex items-center justify-between gap-2 rounded-xl bg-slate-900 border border-slate-700 p-3';
                 const info=document.createElement('div');const title=document.createElement('b');title.className='text-cyan-200';title.textContent=room.name||'아쿠아 방';
-                const meta=document.createElement('div');meta.className='text-slate-400 mt-1';meta.textContent=`코드: ${room.code} · ${room.players}/${room.maxPlayers || 7}명`;
-                info.append(title,meta);const join=document.createElement('button');join.className='liquid-btn px-3 py-2 rounded-lg font-black';join.textContent='입장';join.disabled=room.players>=1;
+                const meta=document.createElement('div');meta.className='text-slate-400 mt-1';meta.textContent=`공개 방 · ${room.players}/${room.maxPlayers || 7}명`;
+                info.append(title,meta);const join=document.createElement('button');join.className='liquid-btn px-3 py-2 rounded-lg font-black';join.textContent='입장';join.disabled=room.players >= (room.maxPlayers || 7) || !!room.started;
                 join.addEventListener('click',()=>joinRoom(room.code));row.append(info,join);list.appendChild(row);
             });
         }
@@ -1124,7 +1161,9 @@
         function createRoom(){
             if(!onlineSocket||!onlineSocket.connected){setOnlineStatus('온라인 서버 연결이 필요합니다.');connectOnline();return;}
             const nick=(document.getElementById('player-nickname-input').value||'아쿠아영웅').trim().slice(0,12);
-            onlineSocket.emit('room:create',{name:`${nick}의 방`,nickname:nick,stageIndex:Number(document.getElementById('start-stage-select').value)||0});
+            const stageNumber=Math.max(-1000,Math.min(100,Math.trunc(Number(document.getElementById('online-stage-number').value)||0)));
+            document.getElementById('online-stage-number').value=String(stageNumber);
+            onlineSocket.emit('room:create',{name:`${nick}의 방`,nickname:nick,stageIndex:100-stageNumber,isPublic:document.getElementById('room-public-toggle').checked});
         }
         function joinRoom(code){
             if(!onlineSocket||!onlineSocket.connected){setOnlineStatus('온라인 서버 연결이 필요합니다.');connectOnline();return;}
@@ -1134,8 +1173,11 @@
         }
         function leaveOnlineRoom(){
             if(onlineSocket&&onlineRoomCode) onlineSocket.emit('room:leave');
-            currentOnlineRoom=null;onlineRoomCode=null;onlineIsHost=false;remotePlayers.clear();
+            currentOnlineRoom=null;onlineRoomCode=null;onlineIsHost=false;onlineRoomMembers=[];remotePlayers.clear();
             document.getElementById('btn-online-start').disabled=true;document.getElementById('btn-leave-room').disabled=true;
+            document.getElementById('online-room-members').textContent='아직 방에 입장하지 않았습니다.';
+            document.getElementById('online-room-waiting').textContent='2명 이상 모이면 방장이 경기를 시작할 수 있습니다.';
+            document.getElementById('btn-online-start').textContent='2명 이상 모이면 시작할 수 있습니다';
             setOnlineStatus('방에서 나왔습니다.');
         }
         function sendOnlineState(){
@@ -1144,7 +1186,6 @@
             onlineSocket.emit('game:state',{x:player.x/canvas.width,y:player.y/canvas.height,radius:player.radius,name:player.name,color:player.color,landColor:player.landColor,stageIndex:currentSeqIdx});
         }
         document.getElementById('btn-online-entry').addEventListener('click',()=>{
-            if(!completedStages.includes(100)){showToast('0단계 최종 보스를 먼저 클리어하세요.');return;}
             document.getElementById('start-screen').classList.add('hidden');document.getElementById('online-modal').classList.remove('hidden');connectOnline();refreshRooms();
         });
         document.getElementById('btn-close-online').addEventListener('click',()=>{document.getElementById('online-modal').classList.add('hidden');document.getElementById('start-screen').classList.remove('hidden');});
@@ -1154,10 +1195,11 @@
         document.getElementById('btn-online-start').addEventListener('click',()=>{
             if(!onlineSocket||!onlineRoomCode){setOnlineStatus('먼저 방에 입장하세요.');return;}
             if(!onlineIsHost){setOnlineStatus('경기 시작은 방장만 할 수 있습니다.');return;}
-            const stageIndex=Number(document.getElementById('start-stage-select').value)||0;
-            onlineSocket.emit('game:start',{stageIndex});
-            document.getElementById('online-modal').classList.add('hidden');
-            startStage(stageIndex);
+            const stageNumber = Math.trunc(Number(document.getElementById('online-stage-number').value));
+            if (!Number.isFinite(stageNumber) || stageNumber < -1000 || stageNumber > 100) { setOnlineStatus('온라인 스테이지는 100부터 -1000 사이로 입력하세요.'); return; }
+            if (onlineRoomMembers.length < 2) { setOnlineStatus('최소 2명이 방에 입장해야 시작할 수 있습니다.'); return; }
+            onlineSocket.emit('game:start',{stageIndex:100-stageNumber});
+            setOnlineStatus('경기 시작 신호를 보내는 중입니다...');
         });
         document.getElementById('btn-leave-room').addEventListener('click',leaveOnlineRoom);
 
