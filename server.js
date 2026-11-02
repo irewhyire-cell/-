@@ -34,7 +34,7 @@ function roomList() {
       code: room.code,
       name: room.name,
       players: room.players.size,
-      maxPlayers: MAX_ROOM_PLAYERS,
+      maxPlayers: room.maxPlayers || MAX_ROOM_PLAYERS,
       stageIndex: room.stageIndex,
       stageNumber: 100 - room.stageIndex,
       started: room.started,
@@ -52,7 +52,7 @@ function publishRoomState(room) {
     name: room.name,
     hostId: room.hostId,
     players: [...room.players.values()],
-    maxPlayers: MAX_ROOM_PLAYERS,
+    maxPlayers: room.maxPlayers || MAX_ROOM_PLAYERS,
     stageIndex: room.stageIndex,
     stageNumber: 100 - room.stageIndex,
     isPublic: room.isPublic,
@@ -113,8 +113,10 @@ function startRoomGame(room, selectedStageIndex = room.stageIndex) {
 }
 
 function enter(socket, room, nickname) {
-  if (room.players.size >= MAX_ROOM_PLAYERS) {
-    return socket.emit('room:error', { message: `이 방은 최대 ${MAX_ROOM_PLAYERS}명까지 입장할 수 있습니다.` });
+  const maxPlayers = Math.max(2, Math.min(MAX_ROOM_PLAYERS, Math.trunc(Number(room.maxPlayers) || MAX_ROOM_PLAYERS)));
+  room.maxPlayers = maxPlayers;
+  if (room.players.size >= maxPlayers) {
+    return socket.emit('room:error', { message: `이 방은 최대 ${maxPlayers}명까지 입장할 수 있습니다.` });
   }
 
   const player = {
@@ -135,7 +137,7 @@ function enter(socket, room, nickname) {
     started: room.started,
     stageIndex: room.stageIndex,
     players: [...room.players.values()],
-    maxPlayers: MAX_ROOM_PLAYERS,
+    maxPlayers: room.maxPlayers || MAX_ROOM_PLAYERS,
     rooms: roomList()
   });
   socket.to(room.code).emit('room:member-joined', player);
@@ -169,11 +171,16 @@ io.on('connection', socket => {
     leave(socket);
     const rawIndex = Number(data?.stageIndex);
     const stageIndex = Number.isFinite(rawIndex) ? Math.max(0, Math.min(1100, Math.trunc(rawIndex))) : 0;
+    const requestedMaxPlayers = Number(data?.maxPlayers);
+    const maxPlayers = Number.isFinite(requestedMaxPlayers)
+      ? Math.max(2, Math.min(MAX_ROOM_PLAYERS, Math.trunc(requestedMaxPlayers)))
+      : MAX_ROOM_PLAYERS;
     const code = makeCode();
     const room = {
       code,
       name: String(data?.name || '아쿠아 방').trim().slice(0, 30) || '아쿠아 방',
       stageIndex,
+      maxPlayers,
       hostId: socket.id,
       players: new Map(),
       started: false,
@@ -194,8 +201,9 @@ io.on('connection', socket => {
       if (room.started && room.spawns?.[socket.id]) socket.emit('game:start', { stageIndex: room.stageIndex, stageNumber: 100 - room.stageIndex, spawns: room.spawns, lateJoin: true });
       return;
     }
-    if (room.players.size >= MAX_ROOM_PLAYERS) {
-      return socket.emit('room:error', { message: `이 방은 최대 ${MAX_ROOM_PLAYERS}명까지 입장할 수 있습니다.` });
+    const roomMaxPlayers = room.maxPlayers || MAX_ROOM_PLAYERS;
+    if (room.players.size >= roomMaxPlayers) {
+      return socket.emit('room:error', { message: `이 방은 최대 ${roomMaxPlayers}명까지 입장할 수 있습니다.` });
     }
     leave(socket);
     enter(socket, room, data?.nickname);
