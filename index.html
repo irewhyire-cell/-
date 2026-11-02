@@ -384,7 +384,7 @@
             <div class="rounded-xl bg-slate-900/80 border border-slate-700 p-3 space-y-1">
                 <div class="text-xs font-bold text-cyan-200">현재 방 참가자</div>
                 <div id="online-room-members" class="text-xs text-slate-300">아직 방에 입장하지 않았습니다.</div>
-                <div id="online-room-waiting" class="text-[10px] text-amber-200">2명 이상 모이면 방장이 경기를 시작할 수 있습니다.</div>
+                <div id="online-room-waiting" class="text-[10px] text-amber-200">방에 들어오면 바로 온라인 게임이 시작됩니다.</div>
             </div>
             <div class="grid grid-cols-2 gap-2">
                 <button id="btn-create-room" class="liquid-btn rounded-xl p-3 font-black text-sm">＋ 방 만들기</button>
@@ -1494,14 +1494,12 @@
             const max = data.maxPlayers || 7;
             if (membersEl) membersEl.textContent = count ? onlineRoomMembers.map((p, i) => `${i + 1}. ${p.name || '아쿠아영웅'}${p.id === onlineSocket?.id ? ' (나)' : ''}${p.id === data.hostId ? ' 👑' : ''}`).join(' · ') : '참가자를 기다리는 중입니다.';
             if (waitingEl) {
-                if (data.started) waitingEl.textContent = '온라인 경기가 진행 중입니다.';
-                else if (count < 2 && onlineIsHost) waitingEl.textContent = `현재 ${count}/${max}명 · 보스 연습 중입니다. 플레이어가 입장하면 자동 시작합니다.`;
-                else if (count < 2) waitingEl.textContent = `플레이어로 입장했습니다 · 방장이 보스 연습 중입니다. 다른 참가자가 들어오면 자동 시작합니다. (${count}/${max}명)`;
-                else waitingEl.textContent = `${count}/${max}명 입장 · 온라인 경기를 시작합니다.`;
+                if (data.started) waitingEl.textContent = `온라인 경기 진행 중 · ${count}/${max}명 참가 · 추가 참가 가능`;
+                else waitingEl.textContent = `방 입장 완료 · 온라인 경기 시작 준비 중 (${count}/${max}명)`;
             }
             if (startBtn) {
                 startBtn.disabled = true;
-                startBtn.textContent = data.started ? '온라인 경기 진행 중' : '참가자 입장 시 자동 시작';
+                startBtn.textContent = data.started ? '온라인 경기 진행 중' : '입장 즉시 자동 시작';
             }
             if (data.code) setOnlineStatus(`${data.isPublic ? '공개' : '비공개'} 방 ${data.code} · ${count}/${max}명${onlineIsHost ? ' · 방장' : ' · 참가자'}`);
             const livePanel = document.getElementById('online-live-roster');
@@ -1629,8 +1627,8 @@
             rooms.forEach(room=>{
                 const row=document.createElement('div');row.className='flex items-center justify-between gap-2 rounded-xl bg-slate-900 border border-slate-700 p-3';
                 const info=document.createElement('div');const title=document.createElement('b');title.className='text-cyan-200';title.textContent=room.name||'아쿠아 방';
-                const meta=document.createElement('div');meta.className='text-slate-400 mt-1';meta.textContent=`${room.started ? '온라인 경기 진행 중 · 중간 참가 가능' : '보스 연습 대기 중 · 참가 가능'} · ${room.players}/${room.maxPlayers || 7}명 · 스테이지 ${room.stageNumber ?? '선택'}`;
-                info.append(title,meta);const join=document.createElement('button');join.className='liquid-btn px-3 py-2 rounded-lg font-black';join.textContent=room.started ? '경기 참가' : '플레이어로 입장';join.disabled=room.players >= (room.maxPlayers || 7);
+                const meta=document.createElement('div');meta.className='text-slate-400 mt-1';meta.textContent=`${room.started ? '온라인 경기 진행 중 · 중간 참가 가능' : '입장 즉시 시작 · 참가 가능'} · ${room.players}/${room.maxPlayers || 7}명 · 스테이지 ${room.stageNumber ?? '선택'}`;
+                info.append(title,meta);const join=document.createElement('button');join.className='liquid-btn px-3 py-2 rounded-lg font-black';join.textContent=room.started ? '바로 참가' : '입장 즉시 시작';join.disabled=room.players >= (room.maxPlayers || 7);
                 join.setAttribute('aria-label', `${room.name || '아쿠아 방'}에 플레이어로 입장`);
                 join.addEventListener('click',()=>joinRoom(room.code));row.append(info,join);list.appendChild(row);
             });
@@ -1678,7 +1676,7 @@
             document.getElementById('online-live-roster')?.classList.add('hidden');
             document.getElementById('btn-online-start').disabled=true;document.getElementById('btn-leave-room').disabled=true;
             document.getElementById('online-room-members').textContent='아직 방에 입장하지 않았습니다.';
-            document.getElementById('online-room-waiting').textContent='2명 이상 모이면 방장이 경기를 시작할 수 있습니다.';
+            document.getElementById('online-room-waiting').textContent='방에 들어오면 바로 온라인 게임이 시작됩니다.';
             document.getElementById('btn-online-start').textContent='2명 이상 모이면 시작할 수 있습니다';
             setOnlineStatus('방에서 나왔습니다.');
         }
