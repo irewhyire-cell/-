@@ -409,6 +409,17 @@
         <button id="btn-cancel-waiting-room" type="button" class="rounded-lg bg-slate-700 px-2 py-1 font-bold text-white">대기 취소</button>
     </div>
 
+    <!-- LIVE ONLINE PLAYERS: visible while waiting and during play -->
+    <div id="online-live-roster" class="hidden fixed z-[34] top-14 right-2 w-[min(19rem,calc(100vw-1rem))] max-w-[calc(100vw-1rem)] rounded-2xl border border-cyan-400/40 bg-slate-950/90 backdrop-blur-md px-3 py-2.5 shadow-2xl text-[11px] text-white pointer-events-none">
+        <div class="flex items-center justify-between gap-2 mb-1">
+            <span id="online-live-connection" class="font-black text-amber-200">● 서버 연결 확인 중</span>
+            <span id="online-live-room" class="font-black text-cyan-200 tracking-wider">방 연결 중</span>
+        </div>
+        <div id="online-live-count" class="font-black text-sm text-white">0/7명 참가</div>
+        <div id="online-live-players" class="mt-1 flex flex-wrap gap-1 text-slate-200">참가자 정보를 받는 중입니다.</div>
+        <div id="online-live-mode" class="mt-1 text-[10px] text-cyan-200">방에 입장하면 바로 게임이 시작됩니다.</div>
+    </div>
+
     <!-- STAGE SELECT MODAL -->
     <div id="stage-modal" class="absolute inset-0 z-40 flex justify-center items-center bg-slate-950/90 backdrop-blur-md p-4 hidden">
         <div class="glass-panel p-6 rounded-3xl max-w-lg w-full max-h-[85vh] flex flex-col border border-blue-500/30 shadow-2xl">
@@ -1464,6 +1475,12 @@
         function updateConnectionLabel(message, good=false) {
             const el=document.getElementById('online-connection-status');
             if(el){el.textContent=message;el.className=good?'text-emerald-300':'text-amber-200';}
+            const live = document.getElementById('online-live-connection');
+            if (live) {
+                const failed = /실패|끊겼|불러오지 못/.test(message);
+                live.textContent = good ? '● 서버 연결됨' : (failed ? '● 서버 연결 오류' : '● 서버 연결 중');
+                live.className = 'font-black ' + (good ? 'text-emerald-300' : (failed ? 'text-rose-300' : 'text-amber-200'));
+            }
         }
         function renderRoomState(data) {
             if (!data) return;
@@ -1487,6 +1504,27 @@
                 startBtn.textContent = data.started ? '온라인 경기 진행 중' : '참가자 입장 시 자동 시작';
             }
             if (data.code) setOnlineStatus(`${data.isPublic ? '공개' : '비공개'} 방 ${data.code} · ${count}/${max}명${onlineIsHost ? ' · 방장' : ' · 참가자'}`);
+            const livePanel = document.getElementById('online-live-roster');
+            const liveRoom = document.getElementById('online-live-room');
+            const liveCount = document.getElementById('online-live-count');
+            const livePlayers = document.getElementById('online-live-players');
+            const liveMode = document.getElementById('online-live-mode');
+            if (livePanel) livePanel.classList.toggle('hidden', !data.code);
+            if (liveRoom) liveRoom.textContent = data.code ? `방 ${data.code}` : '방 연결 중';
+            if (liveCount) liveCount.textContent = `${count}/${max}명 참가`;
+            if (livePlayers) {
+                livePlayers.replaceChildren();
+                onlineRoomMembers.forEach((p, i) => {
+                    const chip = document.createElement('span');
+                    chip.className = 'rounded-lg border border-cyan-500/30 bg-slate-800/90 px-2 py-1';
+                    const isMe = p.id === onlineSocket?.id;
+                    const isHost = p.id === data.hostId;
+                    chip.textContent = `${i + 1}. ${p.name || '아쿠아영웅'}${isMe ? ' (나)' : ''}${isHost ? ' 👑' : ''}`;
+                    livePlayers.appendChild(chip);
+                });
+                if (!count) livePlayers.textContent = '참가자를 기다리는 중입니다.';
+            }
+            if (liveMode) liveMode.textContent = data.started ? '🟢 온라인 게임 진행 중 · 추가 참가 가능' : '입장 완료 · 바로 게임 시작을 준비 중';
             updateOnlineWaitingBanner(data);
         }
         function connectOnline() {
@@ -1533,16 +1571,13 @@
                 renderRoomState(data);
                 renderOnlineRooms(data.rooms||[]);
                 if (data.isHost && !data.started) {
+                    // 서버가 방 생성 직후 온라인 시작 신호를 보냅니다. 별도 대기/연습 화면을 거치지 않습니다.
                     onlineGameStarted = false;
-                    waitingRoomPracticeActive = true;
-                    const requestedStage = Number.isInteger(data.stageIndex) ? Math.max(0, Math.min(1100, data.stageIndex)) : 0;
-                    const requestedStageNumber = 100 - requestedStage;
-                    const practiceStageNumber = requestedStageNumber < 0 ? 100 : Math.max(0, Math.min(100, requestedStageNumber));
-                    const practiceStageIndex = 100 - practiceStageNumber;
+                    waitingRoomPracticeActive = false;
                     document.getElementById('online-modal').classList.add('hidden');
-                    startStage(practiceStageIndex, 'boss');
                     updateOnlineWaitingBanner(data);
-                    showToast(`방 ${data.code} 생성 완료! 보스 ${practiceStageNumber} 연습 중 · 플레이어 입장을 기다립니다.`);
+                    setOnlineStatus(`방 ${data.code} 입장 완료 · 온라인 게임을 바로 시작합니다.`);
+                    showToast('온라인 방 생성 완료 · 게임을 시작합니다!');
                 } else if (!data.isHost && !data.started) {
                     // 일반 참가자도 방에 정상 입장하고, 자동 시작 신호를 기다립니다.
                     onlineGameStarted = false;
@@ -1632,7 +1667,7 @@
             code=String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
             if(!code){setOnlineStatus('방 코드를 입력하세요.');return;}
             const nick=(document.getElementById('player-nickname-input').value||'아쿠아영웅').trim().slice(0,12);
-            emitOnlineActionWhenReady('room:join', {code,nickname:nick}, `방 ${code} 참가 요청을 전송했습니다...`);
+            emitOnlineActionWhenReady('room:join', {code,nickname:nick}, `방 ${code}에 입장 중입니다. 입장 즉시 게임이 시작됩니다...`);
         }
         function leaveOnlineRoom(){
             if(onlineSocket&&onlineRoomCode) onlineSocket.emit('room:leave');
@@ -1640,6 +1675,7 @@
             waitingRoomPracticeActive = false;
             document.getElementById('online-waiting-banner')?.classList.add('hidden');
             currentOnlineRoom=null;onlineRoomCode=null;onlineIsHost=false;onlineRoomMembers=[];remotePlayers.clear();
+            document.getElementById('online-live-roster')?.classList.add('hidden');
             document.getElementById('btn-online-start').disabled=true;document.getElementById('btn-leave-room').disabled=true;
             document.getElementById('online-room-members').textContent='아직 방에 입장하지 않았습니다.';
             document.getElementById('online-room-waiting').textContent='2명 이상 모이면 방장이 경기를 시작할 수 있습니다.';
