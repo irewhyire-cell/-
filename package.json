@@ -1,8 +1,8 @@
 {
   "name": "aqua-wars-online-server",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "private": true,
-  "description": "AQUA WARS Socket.IO room and player-state server",
+  "description": "AQUA WARS online lobby, seven-player rooms and late-join Socket.IO state server",
   "main": "server.js",
   "scripts": { "start": "node server.js" },
   "engines": { "node": ">=20" },
