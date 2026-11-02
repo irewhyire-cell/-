@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="aqua-wars-build" content="온라인 멀티플레이 준비 v3.0">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>AQUA WARS: 클래식 정복 대전 - 업그레이드 완성본</title>
     <!-- Tailwind CSS CDN -->
     <script src="https://cdn.tailwindcss.com"></script>
@@ -71,6 +71,97 @@
         #canvas-container { filter: drop-shadow(0 18px 35px rgba(2,132,199,.12)); }
         @media (max-width: 640px) { #hud { left:6px; right:6px; top:5px; } #canvas-container { margin-top:65px; } #virtual-joystick-container { width:88px; height:88px; bottom:12px; left:12px; } #virtual-joystick-container > div { width:40px; height:40px; } #btn-blast,#btn-rush { padding:.55rem .7rem; } #hud > div:first-child { padding:.45rem .65rem; } #hud > div:first-child > div:first-child { gap:.4rem; } }
         @media (max-height: 620px) { #canvas-container { margin-top:65px; } canvas { max-height:calc(100vh - 90px); } }
+    
+
+        /* Galaxy / Android mobile layout: keep every menu reachable by scrolling. */
+        html { width: 100%; height: 100%; overscroll-behavior: none; }
+        @media (max-width: 760px) {
+            html, body {
+                width: 100%;
+                height: 100%;
+                min-height: 100%;
+                overflow: hidden;
+            }
+            body {
+                width: 100vw;
+                height: 100vh;
+                height: 100dvh;
+                min-height: 0;
+                overflow: hidden;
+            }
+            #start-screen, #online-modal, #stage-modal, #shop-modal, #end-screen, #pause-overlay {
+                position: fixed !important;
+                inset: 0 !important;
+                min-width: 0;
+                min-height: 0;
+                align-items: flex-start !important;
+                justify-content: center !important;
+                padding: max(10px, env(safe-area-inset-top)) 10px max(10px, env(safe-area-inset-bottom)) !important;
+                overflow-x: hidden !important;
+                overflow-y: auto !important;
+                overscroll-behavior: contain;
+                -webkit-overflow-scrolling: touch;
+                box-sizing: border-box;
+            }
+            #start-screen > .glass-panel,
+            #online-modal > .glass-panel,
+            #stage-modal > .glass-panel,
+            #shop-modal > .glass-panel,
+            #end-screen > .glass-panel {
+                width: min(100%, 560px) !important;
+                max-width: 560px !important;
+                max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 20px) !important;
+                height: auto;
+                min-height: 0;
+                flex: 0 0 auto;
+                margin: auto 0;
+                padding: clamp(12px, 3.8vw, 20px) !important;
+                border-radius: 20px;
+                box-sizing: border-box;
+                overflow-x: hidden;
+                overflow-y: auto;
+                overscroll-behavior: contain;
+                -webkit-overflow-scrolling: touch;
+            }
+            #online-modal > .glass-panel { gap: 12px !important; }
+            #online-modal .rounded-xl { overflow-wrap: anywhere; }
+            #online-server-url, #online-stage-number, #room-code-input,
+            #player-nickname-input, input, select {
+                min-height: 44px;
+                font-size: 16px !important;
+                box-sizing: border-box;
+            }
+            #online-modal button, #start-screen button, #stage-modal button, #shop-modal button, #end-screen button {
+                min-height: 44px;
+                touch-action: manipulation;
+            }
+            #btn-close-online, #btn-close-stage, #btn-close-shop {
+                min-width: 44px;
+                min-height: 44px;
+            }
+            #online-modal .flex.gap-2 { align-items: stretch; }
+            #online-server-url { min-width: 0; flex: 1 1 150px; }
+            #btn-apply-server-url { flex: 0 0 auto; padding-left: 12px; padding-right: 12px; }
+            #room-code-input { min-width: 0; }
+            #room-list { overflow-wrap: anywhere; }
+            #stage-grid-container { max-height: min(58dvh, 480px); }
+            #virtual-joystick-container { touch-action: none; }
+        }
+        @media (max-width: 760px) and (max-height: 520px) {
+            #start-screen, #online-modal, #stage-modal, #shop-modal, #end-screen, #pause-overlay {
+                padding: max(6px, env(safe-area-inset-top)) 6px max(6px, env(safe-area-inset-bottom)) !important;
+            }
+            #start-screen > .glass-panel,
+            #online-modal > .glass-panel,
+            #stage-modal > .glass-panel,
+            #shop-modal > .glass-panel,
+            #end-screen > .glass-panel {
+                max-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom) - 12px) !important;
+                padding: 10px !important;
+                border-radius: 14px;
+            }
+        }
+
     </style>
 </head>
 <body class="w-screen h-screen flex flex-col justify-center items-center text-white relative select-none">
@@ -92,6 +183,9 @@
                     </span>
                     <span class="text-amber-400 font-extrabold text-xs sm:text-sm flex items-center gap-1">
                         <i class="fa-solid fa-trophy text-amber-400"></i> 트로피: <span id="hud-trophy-count" class="text-amber-200">0개</span>
+                    </span>
+                    <span class="text-yellow-300 font-extrabold text-xs sm:text-sm flex items-center gap-1">
+                        👑 왕관: <span id="hud-crown-count" class="text-yellow-100">0개</span>
                     </span>
                     <span class="text-amber-300 font-extrabold text-xs sm:text-sm flex items-center gap-1">
                         <i class="fa-solid fa-ticket text-amber-400"></i> 부활권: <span id="hud-ticket-count" class="text-amber-200">0개</span>
@@ -163,7 +257,7 @@
                 <h1 class="text-3xl sm:text-4xl font-black tracking-tight text-white bg-clip-text text-transparent bg-gradient-to-r from-blue-400 via-sky-300 to-cyan-400">
                     AQUA WARS: 클래식
                 </h1>
-                <p class="text-blue-200/70 text-xs sm:text-sm mt-1 font-bold">100단계부터 0단계까지! 영토 40%를 차지하고 최종 보스를 쓰러뜨리세요!</p>
+                <p class="text-blue-200/70 text-xs sm:text-sm mt-1 font-bold">일반전 또는 100명의 보스가 기다리는 보스전에 도전하세요!</p>
             </div>
 
             <div class="bg-slate-900/80 p-3.5 rounded-2xl text-left space-y-2 text-xs sm:text-sm border border-slate-800">
@@ -178,6 +272,15 @@
                         <input id="player-nickname-input" type="text" value="아쿠아영웅" maxlength="12" class="px-2.5 py-1 bg-slate-950 border border-slate-700 rounded-xl text-xs font-bold text-cyan-200 flex-1 focus:outline-none focus:border-cyan-400">
                     </div>
                 </div>
+            </div>
+
+            <div class="bg-slate-900/80 p-3 rounded-2xl border border-fuchsia-500/30 text-left space-y-2">
+                <div class="text-xs font-black text-fuchsia-200">⚔️ 게임 모드 선택</div>
+                <div class="grid grid-cols-2 gap-2">
+                    <button id="btn-mode-normal" type="button" aria-pressed="true" class="p-2.5 rounded-xl border border-sky-400 bg-sky-500/20 text-sky-100 text-xs font-black">🌊 일반 모드</button>
+                    <button id="btn-mode-boss" type="button" aria-pressed="false" class="p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-300 text-xs font-black">👑 보스전 모드</button>
+                </div>
+                <p id="game-mode-description" class="text-[10px] text-slate-400">일반 모드에서는 기존 스테이지 규칙으로 진행합니다.</p>
             </div>
 
             <div class="bg-slate-900/80 p-3 rounded-2xl border border-cyan-500/20 text-left space-y-2">
@@ -200,8 +303,8 @@
                         <i class="fa-solid fa-store"></i> 상점 열기
                     </button>
                 </div>
-                <button id="btn-online-entry" disabled class="w-full py-3 glass-panel text-cyan-200 font-black text-sm rounded-2xl border border-cyan-500/40 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-earth-asia"></i> 온라인 입장 (0단계 클리어 후 해금)
+                <button id="btn-online-entry" class="w-full py-3 glass-panel text-cyan-200 font-black text-sm rounded-2xl border border-cyan-500/40 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-earth-asia"></i> 친구와 온라인 입장
                 </button>
             </div>
         </div>
@@ -215,16 +318,24 @@
                 <button id="btn-close-online" class="text-slate-400 hover:text-white text-xl p-1"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="rounded-xl bg-slate-900 border border-cyan-500/30 p-3 text-xs text-cyan-100 leading-relaxed">
-                <span id="online-connection-status">서버 연결 확인 중...</span><br>비공개 방입니다. 초대 코드가 있는 지인만 참여할 수 있으며, 방당 최대 7명까지 입장할 수 있습니다.
+                <span id="online-connection-status">서버 연결 확인 중...</span><br>공개 방은 열린 방 목록에 표시됩니다. 방을 만들면 보스 연습을 하며 기다리고, 친구가 들어오면 온라인 경기가 자동으로 시작됩니다. 방당 최대 7명까지 입장할 수 있습니다.
             </div>
             <div class="rounded-xl bg-slate-900/80 border border-slate-700 p-3 space-y-2">
-                <label class="flex items-center gap-2 text-xs font-bold text-cyan-100"><input id="room-public-toggle" type="checkbox" class="accent-cyan-400 w-4 h-4"> 공개 방으로 표시 (다른 사람의 공개 방 목록에 보이기)</label>
+                <label for="online-server-url" class="block text-xs font-bold text-slate-300">온라인 서버 주소</label>
+                <div class="flex gap-2">
+                    <input id="online-server-url" type="url" inputmode="url" placeholder="https://서비스이름.onrender.com" class="min-w-0 flex-1 p-2 rounded-xl bg-slate-950 border border-slate-700 text-white text-xs">
+                    <button id="btn-apply-server-url" type="button" class="liquid-btn px-3 rounded-lg text-xs font-black">주소 적용</button>
+                </div>
+                <p class="text-[10px] text-slate-500">Render에 배포한 게임 주소입니다. 웹사이트에서 열면 자동 연결하고, HTML 파일을 직접 열면 이 주소로 연결합니다.</p>
+            </div>
+            <div class="rounded-xl bg-slate-900/80 border border-slate-700 p-3 space-y-2">
+                <label class="flex items-center gap-2 text-xs font-bold text-cyan-100"><input id="room-public-toggle" type="checkbox" checked class="accent-cyan-400 w-4 h-4"> 공개 방으로 표시 (다른 사람의 공개 방 목록에 보이기)</label>
                 <p class="text-[10px] text-slate-500">끄면 비공개 방으로 만들어지고, 8자리 초대 코드를 받은 사람만 입장할 수 있습니다.</p>
             </div>
             <div class="rounded-xl bg-slate-900/80 border border-slate-700 p-3 space-y-2">
                 <label for="online-stage-number" class="block text-xs font-bold text-cyan-200">온라인 시작 스테이지 (100 ~ -1000)</label>
                 <input id="online-stage-number" type="number" min="-1000" max="100" step="1" value="100" class="w-full p-2.5 rounded-xl bg-slate-950 border border-slate-700 text-white text-sm">
-                <p class="text-[10px] text-slate-500">온라인은 100부터 -1000까지 선택할 수 있으며, 음수 스테이지로 갈수록 난이도가 조금씩 올라갑니다.</p>
+                <p class="text-[10px] text-slate-500">100에서 시작해 음수 스테이지 -1000까지 선택할 수 있습니다. 음수 스테이지는 난이도가 조금씩 올라갑니다.</p>
             </div>
             <div class="rounded-xl bg-slate-900/80 border border-slate-700 p-3 space-y-1">
                 <div class="text-xs font-bold text-cyan-200">현재 방 참가자</div>
@@ -244,6 +355,14 @@
             <button id="btn-online-start" class="w-full py-3 liquid-btn rounded-xl font-black text-sm" disabled>방에 입장한 뒤 온라인 경기 시작</button>
             <button id="btn-leave-room" class="w-full py-2 glass-panel rounded-xl text-xs text-slate-300" disabled>방 나가기</button>
         </div>
+    </div>
+
+    <!-- ONLINE ROOM WAITING / BOSS PRACTICE BANNER -->
+    <div id="online-waiting-banner" class="hidden fixed z-[35] top-2 left-1/2 -translate-x-1/2 max-w-[94vw] w-max rounded-xl border border-amber-400/50 bg-slate-950/90 backdrop-blur-md px-3 py-2 shadow-xl text-xs text-amber-100 flex items-center gap-2">
+        <span id="online-waiting-banner-text" class="font-bold">👑 보스 연습 중 · 참가자를 기다립니다</span>
+        <span id="online-waiting-room-code" class="font-black text-cyan-200 tracking-wider"></span>
+        <button id="btn-copy-waiting-room-code" type="button" class="rounded-lg bg-cyan-700 px-2 py-1 font-black text-white">코드 복사</button>
+        <button id="btn-cancel-waiting-room" type="button" class="rounded-lg bg-slate-700 px-2 py-1 font-bold text-white">대기 취소</button>
     </div>
 
     <!-- STAGE SELECT MODAL -->
@@ -277,6 +396,16 @@
                 </div>
                 <div id="color-skin-container" class="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
                 </div>
+            </div>
+
+            <div class="bg-slate-900/80 p-3 rounded-2xl border border-fuchsia-500/40 space-y-2">
+                <div class="flex items-center justify-between gap-2 text-xs font-black text-fuchsia-200">
+                    <span>🌌 오로라 속도 상점</span>
+                    <span>👑 왕관 <span id="shop-crown-count">0</span>개</span>
+                </div>
+                <div id="aurora-level-label" class="text-xs font-bold text-cyan-200">오로라 Lv.0 · 속도 x1.00</div>
+                <p id="aurora-next-description" class="text-[11px] text-slate-400">보스전에서 왕관을 모아 오로라를 구매하세요.</p>
+                <button id="buy-aurora" class="w-full py-2.5 rounded-xl bg-gradient-to-r from-fuchsia-600 to-cyan-500 text-white font-black text-xs">오로라 구매</button>
             </div>
 
             <div class="space-y-2">
@@ -325,6 +454,10 @@
                 <div>
                     <div class="text-slate-400">획득 보상</div>
                     <div id="reward-coins" class="text-lg font-black text-yellow-400">+100 코인</div>
+                </div>
+                <div>
+                    <div class="text-slate-400">왕관 보상</div>
+                    <div id="reward-crowns" class="text-lg font-black text-yellow-300">+0 👑</div>
                 </div>
             </div>
 
@@ -410,7 +543,7 @@
     </script>
 
     <!-- GAME LOGIC -->
-    <script src="/socket.io/socket.io.js"></script>
+    <script src="https://cdn.socket.io/4.8.1/socket.io.min.js" crossorigin="anonymous"></script>
     <script>
         const COLS = 70;
         const ROWS = 70;
@@ -439,6 +572,15 @@
             { name: '에시드 AI', color: '#10b981', landColor: '#047857' }
         ];
 
+        const AURORA_SHOP = [
+            { name: '오로라 I', cost: 1, multiplier: 1.08, bonus: '속도 +8%' },
+            { name: '오로라 II', cost: 3, multiplier: 1.12, bonus: '속도 +12%' },
+            { name: '오로라 III', cost: 7, multiplier: 1.18, bonus: '속도 +18%' },
+            { name: '오로라 IV', cost: 13, multiplier: 1.25, bonus: '속도 +25%' },
+            { name: '오로라 V', cost: 22, multiplier: 1.35, bonus: '속도 +35%' },
+            { name: '오로라 VI', cost: 35, multiplier: 1.50, bonus: '속도 +50%' }
+        ];
+
         const SKINS = [
             { id: 'default', name: '네온 블루', color: '#2563eb', landColor: '#1d4ed8', trophyCost: 0, unlocked: true },
             { id: 'gold', name: '황금 태양', color: '#f59e0b', landColor: '#d97706', trophyCost: 1, unlocked: false },
@@ -452,6 +594,8 @@
 
         let selectedSkin = SKINS[0];
         let totalTrophies = 0;
+        let totalCrowns = 0;
+        let auroraLevel = 0;
         let totalCoins = 0;
         let coinMultiplier = 1;
         let speedBoostMult = 1.0;
@@ -464,6 +608,8 @@
         let cellSize = 10;
 
         let currentSeqIdx = 0;
+        let selectedGameMode = 'normal';
+        let activeGameMode = 'normal';
         let grid = [];
         let player = null;
         let bossKraken = null;
@@ -483,6 +629,17 @@
         let isGameOver = false;
         let targetPointer = { x: 0, y: 0, active: false };
         let keys = {};
+
+        function isBossBattleForCurrentMode(cfg = LEVEL_CONFIGS[currentSeqIdx]) {
+            if (!cfg) return false;
+            if (cfg.isZeroStage) return true;
+            if (activeGameMode === 'boss') return cfg.stageNumber >= 1 && cfg.stageNumber <= 100;
+            return !!cfg.isBossStage;
+        }
+
+        function getAuroraSpeedMultiplier() {
+            return AURORA_SHOP.slice(0, auroraLevel).reduce((mult, item) => mult * item.multiplier, 1);
+        }
 
         const joystickContainer = document.getElementById('virtual-joystick-container');
         const joystickStick = document.getElementById('joystick-stick');
@@ -587,12 +744,16 @@
                     }
                 }
 
+                // 대각선 키 입력도 보스의 추적 방향과 같은 최대 이동량으로 제한합니다.
+                const moveLength = Math.hypot(moveX, moveY);
+                if (moveLength > 1) { moveX /= moveLength; moveY /= moveLength; }
+
                 this.vx += moveX * 0.5;
                 this.vy += moveY * 0.5;
                 this.vx *= 0.85;
                 this.vy *= 0.85;
 
-                const finalSpeed = speedMultiplier * (this.isPlayer ? speedBoostMult : 1.0);
+                const finalSpeed = speedMultiplier * (this.isPlayer ? speedBoostMult * getAuroraSpeedMultiplier() : 1.0);
                 this.x += this.vx * finalSpeed;
                 this.y += this.vy * finalSpeed;
 
@@ -642,9 +803,14 @@
             player = new WaterEntity(nick, selectedSkin.color, selectedSkin.landColor, canvas.width / 2, canvas.height * 0.8, true, 1);
 
             const bossContainer = document.getElementById('boss-hp-container');
+            const isBossBattle = isBossBattleForCurrentMode(cfg);
             document.getElementById('bar-boss').style.width = '100%';
-            if (cfg.isBossStage) {
-                bossKraken = new WaterEntity("크라켄 보스", '#ef4444', '#991b1b', canvas.width / 2, canvas.height * 0.25, false, 99, true);
+            if (isBossBattle) {
+                const bossName = cfg.isZeroStage ? '최종 보스 오로라 크라켄' : `보스 ${cfg.stageNumber}`;
+                bossKraken = new WaterEntity(bossName, cfg.isZeroStage ? '#f0abfc' : '#ef4444', cfg.isZeroStage ? '#86198f' : '#991b1b', canvas.width / 2, canvas.height * 0.25, false, 99, true);
+                if (activeGameMode === 'boss' && !cfg.isZeroStage) bossKraken.maxHp = 350 + (100 - cfg.stageNumber) * 3;
+                if (cfg.isZeroStage) bossKraken.maxHp = 1800;
+                bossKraken.hp = bossKraken.maxHp;
                 aiEntities.push(bossKraken);
                 bossContainer.classList.remove('hidden');
             } else {
@@ -653,9 +819,15 @@
                 aiEntities.push(new WaterEntity(AI_CONFIGS[1].name, AI_CONFIGS[1].color, AI_CONFIGS[1].landColor, canvas.width * 0.8, canvas.height * 0.2, false, 3));
             }
 
-            document.getElementById('level-badge').style.backgroundColor = cfg.color;
-            document.getElementById('level-badge').innerText = cfg.isZeroStage ? `🏆 Stage 0` : (cfg.isBossStage ? `👑 Stage ${cfg.stageNumber}` : `🌊 Stage ${cfg.stageNumber}`);
-            document.getElementById('speed-multiplier-label').innerText = `적 이동속도 x${(cfg.speedMult * (cfg.isBossStage ? 1.12 : 0.92)).toFixed(1)}`;
+            const displayColor = cfg.isZeroStage ? '#a21caf' : (isBossBattle ? '#b91c1c' : cfg.color);
+            document.getElementById('level-badge').style.backgroundColor = displayColor;
+            document.getElementById('level-badge').innerText = cfg.isZeroStage ? `⚡ 0단계 최종 보스` : (isBossBattle ? `👑 보스 ${cfg.stageNumber}` : `🌊 Stage ${cfg.stageNumber}`);
+            const displayedEnemySpeed = isBossBattle
+                ? cfg.speedMult * 1.65 * speedBoostMult * getAuroraSpeedMultiplier()
+                : cfg.speedMult * 0.92;
+            document.getElementById('speed-multiplier-label').innerText = isBossBattle
+                ? `보스 속도 캐릭터보다 3% 낮음 x${(displayedEnemySpeed * 0.97).toFixed(2)}`
+                : `적 이동속도 x${displayedEnemySpeed.toFixed(1)}`;
             updateHud();
 
             spawnWildDrops(25);
@@ -684,9 +856,9 @@
                 for (let t of targets) {
                     if (Math.hypot(t.x - p.x, t.y - p.y) < t.radius + p.radius) {
                         t.hp -= p.power;
-                        t.mass = Math.max(15, t.mass - 10);
+                        if (!t.isBoss) t.mass = Math.max(15, t.mass - 10);
                         if (t.isBoss) document.getElementById('bar-boss').style.width = `${Math.max(0, (t.hp / t.maxHp) * 100)}%`;
-                        if (t.hp <= 0 || t.mass <= 18) {
+                        if (t.hp <= 0 || (!t.isBoss && t.mass <= 18)) {
                             t.isAlive = false;
                             if (t.isPlayer) {
                                 endGame(false, 0);
@@ -812,8 +984,10 @@
             if (percentLabel) percentLabel.innerText = `${percent.toFixed(1)}% / ${TARGET_PERCENT}%`;
 
             if (isGameRunning) {
-                if (cfg.isBossStage) {
-                    if ((bossKraken && !bossKraken.isAlive) || percent >= TARGET_PERCENT) endGame(true, percent);
+                const bossBattle = isBossBattleForCurrentMode(cfg);
+                if (bossBattle) {
+                    const bossDefeated = bossKraken && !bossKraken.isAlive;
+                    if (bossDefeated || (activeGameMode !== 'boss' && percent >= TARGET_PERCENT)) endGame(true, percent);
                 } else if (percent >= TARGET_PERCENT) {
                     endGame(true, percent);
                 }
@@ -823,10 +997,15 @@
         let loopScheduled = false;
         function loop() {
             loopScheduled = false;
-            if (isGameRunning) {
-                const cfg = LEVEL_CONFIGS[currentSeqIdx];
-                if (player) player.update(cfg.speedMult * 1.65);
-                aiEntities.forEach(ai => ai.update(cfg.isBossStage ? cfg.speedMult * 1.12 : cfg.speedMult * 0.92));
+            if (isGameRunning) {                const cfg = LEVEL_CONFIGS[currentSeqIdx];
+                const playerBaseSpeed = cfg.speedMult * 1.65;
+                const matchedPlayerSpeed = playerBaseSpeed * speedBoostMult * getAuroraSpeedMultiplier();
+                if (player) player.update(playerBaseSpeed);
+                aiEntities.forEach(ai => {
+                    // 보스는 플레이어보다 3% 느린 이동 속도 배율을 사용합니다.
+                    const enemySpeed = ai.isBoss ? matchedPlayerSpeed * 0.97 : cfg.speedMult * 0.92;
+                    ai.update(enemySpeed);
+                });
                 handleInteractions();
                 sendOnlineState();
                 draw();
@@ -853,15 +1032,25 @@
                 const earnedReward = Math.round(cfg.reward * coinMultiplier);
                 totalCoins += earnedReward;
                 maxUnlockedSeq = Math.max(maxUnlockedSeq, Math.min(100, currentSeqIdx + 1));
-                const firstClear = !completedStages.includes(currentSeqIdx);
-                if (firstClear) completedStages.push(currentSeqIdx);
-                if (cfg.isZeroStage && firstClear) { totalTrophies += 1; showToast("🏆 0단계 최초 클리어! 트로피 획득!"); }
+                const progressList = activeGameMode === 'boss' ? completedBossStages : completedStages;
+                const firstClear = !progressList.includes(currentSeqIdx);
+                if (firstClear) progressList.push(currentSeqIdx);
+                let earnedCrowns = 0;
+                // 보스전은 같은 스테이지를 다시 클리어해도 매번 왕관을 지급합니다.
+                if (activeGameMode === 'boss') {
+                    earnedCrowns = cfg.isZeroStage ? 10 : 1;
+                    totalCrowns += earnedCrowns;
+                }
+                if (cfg.isZeroStage && firstClear && activeGameMode !== 'boss') { totalTrophies += 1; showToast("🏆 0단계 최초 클리어! 트로피 획득!"); }
+                if (earnedCrowns > 0) showToast(`👑 보스 격파 보상! 왕관 ${earnedCrowns}개 획득!`);
                 document.getElementById('reward-coins').innerText = `+${earnedReward} 코인`;
+                document.getElementById('reward-crowns').innerText = `+${earnedCrowns} 👑`;
                 document.getElementById('result-title').innerText = `${cfg.stageNumber} 단계 클리어!`;
-                document.getElementById('result-desc').innerText = cfg.isZeroStage ? "최종 보스 격파! 온라인 로비가 해금되었습니다." : (cfg.isBossStage ? "보스 정복 성공! 다음 단계가 열렸습니다." : "스테이지 정복에 성공했습니다.");
+                document.getElementById('result-desc').innerText = cfg.isZeroStage ? (activeGameMode === 'boss' ? "초고속 최종 보스를 격파할 때마다 왕관 10개를 받습니다." : "초고속 최종 보스를 격파했습니다!") : (activeGameMode === 'boss' ? "보스 정복 성공! 클리어할 때마다 왕관 1개를 받습니다. 왕관으로 오로라 속도를 강화하세요." : (cfg.isBossStage ? "보스 정복 성공! 다음 단계가 열렸습니다." : "스테이지 정복에 성공했습니다."));
                 document.getElementById('btn-next-level').classList.toggle('hidden', cfg.isZeroStage);
                 document.getElementById('revive-container').classList.add('hidden');
             } else {
+                document.getElementById('reward-crowns').innerText = '+0 👑';
                 document.getElementById('result-title').innerText = "실패!";
                 document.getElementById('result-desc').innerText = "상대에게 흡수당하거나 파괴되어 패배했습니다.";
                 document.getElementById('btn-next-level').classList.add('hidden');
@@ -871,6 +1060,25 @@
             document.getElementById('end-screen').classList.remove('hidden');
             document.getElementById('hud-coin-count').innerText = totalCoins;
             updateHud(); saveGame();
+        }
+
+        function renderAuroraShop() {
+            const label = document.getElementById('aurora-level-label');
+            const description = document.getElementById('aurora-next-description');
+            const button = document.getElementById('buy-aurora');
+            if (!label || !description || !button) return;
+            const speed = getAuroraSpeedMultiplier();
+            label.textContent = `오로라 Lv.${auroraLevel}/${AURORA_SHOP.length} · 이동 속도 x${speed.toFixed(2)}`;
+            const next = AURORA_SHOP[auroraLevel];
+            if (!next) {
+                description.textContent = '모든 오로라를 모았습니다! 최고 속도에 도달했습니다.';
+                button.textContent = '오로라 최대 레벨';
+                button.disabled = true;
+                return;
+            }
+            description.textContent = `다음 구매: ${next.name} · ${next.bonus} · 가격 ${next.cost} 왕관`;
+            button.textContent = `🌌 ${next.name} 구매 · 👑 ${next.cost}개`;
+            button.disabled = totalCrowns < next.cost;
         }
 
         function renderSkinShop() {
@@ -892,12 +1100,36 @@
                 });
                 container.appendChild(btn);
             });
+            renderAuroraShop();
         }
 
         // --- UPGRADE PACK: save data, shop, pause, turbo, revive and pointer controls ---
         const SAVE_KEY = 'aquaWarsClassicSave_v2';
         let maxUnlockedSeq = 0;
         let completedStages = [];
+        let completedBossStages = [];
+
+        function updateGameModeButtons() {
+            const normal = document.getElementById('btn-mode-normal');
+            const boss = document.getElementById('btn-mode-boss');
+            const desc = document.getElementById('game-mode-description');
+            const normalOn = selectedGameMode === 'normal';
+            if (normal) {
+                normal.setAttribute('aria-pressed', String(normalOn));
+                normal.className = normalOn
+                    ? 'p-2.5 rounded-xl border border-sky-400 bg-sky-500/20 text-sky-100 text-xs font-black ring-2 ring-sky-400/40'
+                    : 'p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-300 text-xs font-black';
+            }
+            if (boss) {
+                boss.setAttribute('aria-pressed', String(!normalOn));
+                boss.className = !normalOn
+                    ? 'p-2.5 rounded-xl border border-fuchsia-400 bg-fuchsia-500/20 text-fuchsia-100 text-xs font-black ring-2 ring-fuchsia-400/40'
+                    : 'p-2.5 rounded-xl border border-slate-700 bg-slate-950 text-slate-300 text-xs font-black';
+            }
+            if (desc) desc.textContent = normalOn
+                ? '일반 모드에서는 기존 스테이지 규칙으로 진행합니다.'
+                : '보스전 전용 모드! 100~1단계는 모두 보스, 0단계는 초고속 최종 보스입니다.';
+        }
         let turboActive = false;
         let turboReady = true;
         let paused = false;
@@ -909,6 +1141,10 @@
             document.getElementById('hud-ticket-count').innerText = `${revivalTickets}개`;
             const trophy = document.getElementById('shop-trophy-count');
             if (trophy) trophy.innerText = totalTrophies;
+            const hudCrowns = document.getElementById('hud-crown-count');
+            if (hudCrowns) hudCrowns.innerText = `${totalCrowns}개`;
+            const shopCrowns = document.getElementById('shop-crown-count');
+            if (shopCrowns) shopCrowns.innerText = totalCrowns;
             const p2 = document.getElementById('price-coin-2x');
             const ps = document.getElementById('price-speed-up');
             if (p2) p2.innerText = prices.coin2x;
@@ -917,7 +1153,9 @@
             if (coinBtn) { coinBtn.disabled = coinMultiplier >= 2; coinBtn.innerHTML = coinMultiplier >= 2 ? '구매 완료' : `<span id="price-coin-2x">${prices.coin2x}</span> 코인`; }
             const speedBtn = document.getElementById('buy-speed-up');
             if (speedBtn) { speedBtn.disabled = speedBoostMult >= 2.5; speedBtn.innerHTML = speedBoostMult >= 2.5 ? '최대 레벨' : `<span id="price-speed-up">${prices.speedUp}</span> 코인`; }
+            renderAuroraShop();
             const onlineBtn = document.getElementById('btn-online-entry');
+            // 온라인 로비는 처음부터 입장할 수 있습니다.
             if (onlineBtn) { onlineBtn.disabled = false; onlineBtn.innerHTML = '<i class="fa-solid fa-earth-asia"></i> 친구와 온라인 입장'; }
             refreshStartStageSelect();
         }
@@ -929,20 +1167,25 @@
             LEVEL_CONFIGS.slice(0, 101).forEach((cfg, idx) => {
                 const opt = document.createElement('option');
                 opt.value = String(idx);
-                opt.textContent = `${cfg.isZeroStage ? '🏆 최종 보스 ' : (cfg.isBossStage ? '👑 보스 ' : '')}${cfg.stageNumber} 단계${completedStages.includes(idx) ? ' ✓ 클리어' : ''}`;
+                const cleared = (selectedGameMode === 'boss' ? completedBossStages : completedStages).includes(idx);
+                const prefix = cfg.isZeroStage ? '⚡ 최종 보스 ' : (selectedGameMode === 'boss' ? '👑 보스 ' : (cfg.isBossStage ? '👑 보스 ' : ''));
+                opt.textContent = `${prefix}${cfg.stageNumber} 단계${cleared ? ' ✓ 클리어' : ''}`;
                 select.appendChild(opt);
             });
-            select.value = String(Math.max(0, Math.min(previous, LEVEL_CONFIGS.length - 1)));
+            select.value = String(Math.max(0, Math.min(previous, 100)));
             const help = document.getElementById('start-stage-help');
-            if (help) help.textContent = '일반 모드는 100~0단계 선택, 온라인은 100~-1000단계까지 지원합니다.';
+            if (help) help.textContent = selectedGameMode === 'boss'
+                ? '보스전 모드: 100~1단계의 100개 스테이지가 모두 보스전이며, 0단계는 초고속 최종 보스입니다. 보스를 클리어할 때마다 왕관을 받습니다. (일반 보스 1개, 최종 보스 10개)'
+                : '일반 모드: 기존 규칙대로 진행합니다. 10단계마다 보스가 등장하며 0단계는 최종 보스입니다.';
+            updateGameModeButtons();
         }
 
         function saveGame() {
             try {
                 localStorage.setItem(SAVE_KEY, JSON.stringify({
-                    totalTrophies, totalCoins, coinMultiplier, speedBoostMult, revivalTickets,
+                    totalTrophies, totalCrowns, auroraLevel, totalCoins, coinMultiplier, speedBoostMult, revivalTickets,
                     prices, selectedSkinId: selectedSkin.id,
-                    skins: SKINS.map(x => ({id:x.id, unlocked:x.unlocked})), maxUnlockedSeq, completedStages,
+                    skins: SKINS.map(x => ({id:x.id, unlocked:x.unlocked})), maxUnlockedSeq, completedStages, completedBossStages,
                     nickname: document.getElementById('player-nickname-input').value
                 }));
             } catch (e) { console.warn('저장 공간을 사용할 수 없습니다.', e); }
@@ -952,6 +1195,8 @@
                 const d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null');
                 if (!d) return;
                 totalTrophies = Math.max(0, Number(d.totalTrophies) || 0);
+                totalCrowns = Math.max(0, Number(d.totalCrowns) || 0);
+                auroraLevel = Math.max(0, Math.min(AURORA_SHOP.length, Number(d.auroraLevel) || 0));
                 totalCoins = Math.max(0, Number(d.totalCoins) || 0);
                 coinMultiplier = d.coinMultiplier === 2 ? 2 : 1;
                 speedBoostMult = Math.max(1, Math.min(2.5, Number(d.speedBoostMult) || 1));
@@ -959,13 +1204,15 @@
                 prices = {coin2x: Math.max(100, Number(d.prices?.coin2x) || 100), speedUp: Math.max(100, Number(d.prices?.speedUp) || 100)};
                 maxUnlockedSeq = Math.max(0, Math.min(100, Number(d.maxUnlockedSeq) || 0));
                 completedStages = Array.isArray(d.completedStages) ? d.completedStages.filter(n => Number.isInteger(n) && n >= 0 && n <= 100) : [];
+                completedBossStages = Array.isArray(d.completedBossStages) ? d.completedBossStages.filter(n => Number.isInteger(n) && n >= 0 && n <= 100) : [];
                 (d.skins || []).forEach(saved => { const skin = SKINS.find(x => x.id === saved.id); if (skin && saved.unlocked) skin.unlocked = true; });
                 selectedSkin = SKINS.find(x => x.id === d.selectedSkinId && x.unlocked) || SKINS[0];
                 if (d.nickname) document.getElementById('player-nickname-input').value = String(d.nickname).slice(0,12);
             } catch (e) { console.warn('저장 데이터를 불러오지 못했습니다.', e); }
             updateHud();
         }
-        function startStage(idx) {
+        function startStage(idx, mode = selectedGameMode) {
+            activeGameMode = mode || 'normal';
             paused = false;
             document.getElementById('pause-overlay')?.classList.add('hidden');
             document.getElementById('stage-modal').classList.add('hidden');
@@ -1007,12 +1254,23 @@
             isGameOver = false; isGameRunning = true; updateHud(); saveGame();
             showToast('🎟️ 부활 성공! 다시 정복을 시작하세요.'); resumeLoop();
         }
+        function buyAurora() {
+            const next = AURORA_SHOP[auroraLevel];
+            if (!next) { showToast('모든 오로라를 구매했습니다!'); return; }
+            if (totalCrowns < next.cost) { showToast(`왕관이 부족합니다. ${next.cost}개가 필요합니다.`); return; }
+            totalCrowns -= next.cost;
+            auroraLevel++;
+            showToast(`🌌 ${next.name} 구매 완료! 이동 속도 x${getAuroraSpeedMultiplier().toFixed(2)}`);
+            updateHud(); saveGame(); renderSkinShop();
+        }
+
         function buyItem(kind) {
             if (kind === 'ticket') { if (!spendCoins(1000)) return; revivalTickets++; showToast('부활권 1개를 구매했습니다.'); }
             if (kind === 'coin2x') { if (coinMultiplier >= 2) { showToast('이미 코인 2배가 적용 중입니다.'); return; } if (!spendCoins(prices.coin2x)) return; coinMultiplier = 2; showToast('코인 획득량이 2배가 되었습니다!'); }
             if (kind === 'speed') { if (speedBoostMult >= 2.5) { showToast('이동 속도 강화 최대 레벨입니다.'); return; } if (!spendCoins(prices.speedUp)) return; speedBoostMult = Math.min(2.5, speedBoostMult + .2); prices.speedUp = Math.round(prices.speedUp * 1.7); showToast(`이동 속도 강화! x${speedBoostMult.toFixed(1)}`); }            updateHud(); saveGame(); renderSkinShop();
         }
         document.getElementById('buy-ticket').addEventListener('click', () => buyItem('ticket'));
+        document.getElementById('buy-aurora').addEventListener('click', buyAurora);
         document.getElementById('buy-coin-2x').addEventListener('click', () => buyItem('coin2x'));
         document.getElementById('buy-speed-up').addEventListener('click', () => buyItem('speed'));
         document.getElementById('btn-rush').addEventListener('click', useTurbo);
@@ -1020,7 +1278,7 @@
         document.getElementById('btn-revive').addEventListener('click', tryRevive);
         document.getElementById('btn-resume-game').addEventListener('click', togglePause);
         document.getElementById('btn-pause-lobby').addEventListener('click', () => { paused=false; isGameRunning=false; saveGame(); document.getElementById('pause-overlay').classList.add('hidden'); document.getElementById('btn-pause').innerHTML='<i class="fa-solid fa-pause"></i>'; document.getElementById('start-screen').classList.remove('hidden'); });
-        document.getElementById('btn-pause-restart').addEventListener('click', () => startStage(currentSeqIdx));
+        document.getElementById('btn-pause-restart').addEventListener('click', () => startStage(currentSeqIdx, activeGameMode));
         document.getElementById('gameCanvas').addEventListener('pointerdown', e => {
             if (e.pointerType === 'mouse' && isGameRunning) { const r=canvas.getBoundingClientRect(); targetPointer={x:(e.clientX-r.left)*canvas.width/r.width,y:(e.clientY-r.top)*canvas.height/r.height,active:true}; }
         });
@@ -1031,26 +1289,33 @@
         document.getElementById('player-nickname-input').addEventListener('change', saveGame);
         window.addEventListener('keydown', e => { if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Space'].includes(e.code)) e.preventDefault(); if (e.code === 'Escape' && !document.getElementById('start-screen').classList.contains('hidden')) return; if (e.code === 'Escape') togglePause(); }, {passive:false});
         loadGame();
+        updateGameModeButtons();
         updateHud();
 
         function renderStageGrid() {
             const gridContainer = document.getElementById('stage-grid-container');
             if (!gridContainer) return;
             gridContainer.innerHTML = '';
+            const startScreenVisible = !document.getElementById('start-screen').classList.contains('hidden');
+            const modeForGrid = startScreenVisible ? selectedGameMode : activeGameMode;
+            const gridMode = modeForGrid === 'boss' ? 'boss' : (modeForGrid === 'online' ? 'online' : 'normal');
             LEVEL_CONFIGS.slice(0, 101).forEach((cfg, idx) => {
                 const btn = document.createElement('button');
-                const unlocked = true; // 시작부터 모든 스테이지 선택 가능
-                btn.className = `p-2 rounded-xl font-bold text-xs ${cfg.isZeroStage ? 'bg-amber-600 text-white' : (cfg.isBossStage ? 'bg-rose-800 text-white' : 'bg-slate-800 text-slate-200')}`;
-                btn.innerText = `${completedStages.includes(idx) ? '★ ' : (cfg.isBossStage ? '👑 ' : '🌊 ')}${cfg.stageNumber}`;
+                const isBossInGrid = cfg.isZeroStage || (gridMode === 'boss' ? cfg.stageNumber >= 1 : cfg.isBossStage);
+                const cleared = (gridMode === 'boss' ? completedBossStages : completedStages).includes(idx);
+                btn.className = `p-2 rounded-xl font-bold text-xs ${cfg.isZeroStage ? 'bg-fuchsia-700 text-white' : (isBossInGrid ? 'bg-rose-800 text-white' : 'bg-slate-800 text-slate-200')}`;
+                btn.innerText = `${cleared ? '★ ' : (isBossInGrid ? '👑 ' : '🌊 ')}${cfg.stageNumber}`;
                 btn.disabled = false;
-                btn.title = `${cfg.stageNumber} 단계 바로 시작`;
-                btn.addEventListener('click', () => startStage(idx));
+                btn.title = `${cfg.stageNumber} 단계 ${isBossInGrid ? '보스전' : '일반전'} 바로 시작`;
+                btn.addEventListener('click', () => startStage(idx, gridMode));
                 gridContainer.appendChild(btn);
             });
         }
 
         // Event listeners
-        document.getElementById('btn-start-test').addEventListener('click', () => startStage(Number(document.getElementById('start-stage-select')?.value || 0)));
+        document.getElementById('btn-mode-normal').addEventListener('click', () => { selectedGameMode = 'normal'; refreshStartStageSelect(); });
+        document.getElementById('btn-mode-boss').addEventListener('click', () => { selectedGameMode = 'boss'; refreshStartStageSelect(); });
+        document.getElementById('btn-start-test').addEventListener('click', () => startStage(Number(document.getElementById('start-stage-select')?.value || 0), selectedGameMode));
         document.getElementById('start-stage-select').addEventListener('change', e => { const cfg=LEVEL_CONFIGS[Number(e.target.value)||0]; document.getElementById('btn-start-test').innerHTML = `<i class="fa-solid fa-play"></i> ${cfg.stageNumber}단계 시작하기`; });
 
         document.getElementById('btn-open-stage-select').addEventListener('click', () => { renderStageGrid(); document.getElementById('stage-modal').classList.remove('hidden'); });
@@ -1061,8 +1326,8 @@
         document.getElementById('btn-start-shop-modal').addEventListener('click', () => { renderSkinShop(); document.getElementById('shop-modal').classList.remove('hidden'); });
         document.getElementById('btn-close-shop').addEventListener('click', () => document.getElementById('shop-modal').classList.add('hidden'));
 
-        document.getElementById('btn-next-level').addEventListener('click', () => startStage(Math.min(100, currentSeqIdx + 1)));
-        document.getElementById('btn-restart').addEventListener('click', () => startStage(0));
+        document.getElementById('btn-next-level').addEventListener('click', () => startStage(Math.min(LEVEL_CONFIGS.length - 1, currentSeqIdx + 1), activeGameMode));
+        document.getElementById('btn-restart').addEventListener('click', () => startStage(0, activeGameMode));
 
         document.getElementById('btn-return-lobby').addEventListener('click', () => {
             isGameRunning = false; paused = false;
@@ -1080,8 +1345,30 @@
         window.addEventListener('keyup', (e) => keys[e.code] = false);
         window.addEventListener('beforeunload', saveGame);
 
-        // Real online multiplayer transport (Socket.IO). The server URL is same-origin when deployed.
+        // Socket.IO online transport. Hosted pages use their own origin; downloaded HTML uses the Render URL below.
+        const DEFAULT_RENDER_SERVER_URL = 'https://aqua-wars-online.onrender.com';
+        const SERVER_URL_STORAGE_KEY = 'aquaWarsOnlineServerUrl_v1';
+        let onlineServerUrl = (() => {
+            try {
+                const saved = localStorage.getItem(SERVER_URL_STORAGE_KEY);
+                if (saved) return new URL(saved).origin;
+            } catch (e) { /* local file storage may be unavailable */ }
+            return location.protocol === 'file:' ? DEFAULT_RENDER_SERVER_URL : location.origin;
+        })();
         let currentOnlineRoom = null;
+        let waitingRoomPracticeActive = false;
+        function updateOnlineWaitingBanner(data = currentOnlineRoom) {
+            const banner = document.getElementById('online-waiting-banner');
+            const codeEl = document.getElementById('online-waiting-room-code');
+            const textEl = document.getElementById('online-waiting-banner-text');
+            if (!banner) return;
+            const waiting = !!(waitingRoomPracticeActive && onlineIsHost && onlineRoomCode && data && !data.started);
+            banner.classList.toggle('hidden', !waiting);
+            if (waiting) {
+                if (codeEl) codeEl.textContent = `코드 ${onlineRoomCode}`;
+                if (textEl) textEl.textContent = `👑 보스 연습 중 · ${onlineRoomMembers.length}/7명 · 참가자를 기다립니다`;
+            }
+        }
         function setOnlineStatus(message) {
             const el = document.getElementById('room-status'); if (el) el.textContent = message;
         }
@@ -1100,20 +1387,22 @@
             const count = onlineRoomMembers.length;
             const max = data.maxPlayers || 7;
             if (membersEl) membersEl.textContent = count ? onlineRoomMembers.map((p, i) => `${i + 1}. ${p.name || '아쿠아영웅'}${p.id === onlineSocket?.id ? ' (나)' : ''}${p.id === data.hostId ? ' 👑' : ''}`).join(' · ') : '참가자를 기다리는 중입니다.';
-            if (waitingEl) waitingEl.textContent = data.started ? '경기가 진행 중입니다.' : (count < 2 ? `현재 ${count}/${max}명 · 2명 이상 입장하면 방장이 시작할 수 있습니다.` : `${count}/${max}명 입장 완료 · 방장이 시작할 수 있습니다.`);
+            if (waitingEl) waitingEl.textContent = data.started ? '경기가 진행 중입니다.' : (count < 2 ? `현재 ${count}/${max}명 · 보스 연습 중입니다. 참가자가 들어오면 자동 시작합니다.` : `${count}/${max}명 입장 · 온라인 경기로 이동합니다.`);
             if (startBtn) {
-                startBtn.disabled = !onlineIsHost || count < 2 || !!data.started;
-                startBtn.textContent = onlineIsHost ? (count < 2 ? '2명 이상 모이면 시작할 수 있습니다' : '온라인 경기 시작 (방장)') : '방장이 시작할 때까지 대기';
+                startBtn.disabled = true;
+                startBtn.textContent = data.started ? '온라인 경기 진행 중' : '참가자 입장 시 자동 시작';
             }
             if (data.code) setOnlineStatus(`${data.isPublic ? '공개' : '비공개'} 방 ${data.code} · ${count}/${max}명${onlineIsHost ? ' · 방장' : ' · 참가자'}`);
+            updateOnlineWaitingBanner(data);
         }
         function connectOnline() {
-            if (typeof io !== 'function') { updateConnectionLabel('온라인 연결 도구를 불러오지 못했습니다. 배포 서버에서 다시 접속해 주세요.'); return; }
+            if (typeof io !== 'function') { updateConnectionLabel('온라인 연결 도구를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.'); return; }
             if (onlineSocket) return;
-            onlineSocket = io({transports:['websocket','polling'], reconnection:true, reconnectionAttempts:8, timeout:8000});
+            const targetUrl = location.protocol === 'file:' ? onlineServerUrl : (onlineServerUrl || location.origin);
+            onlineSocket = io(targetUrl, {transports:['websocket','polling'], reconnection:true, reconnectionAttempts:8, timeout:12000});
             onlineSocket.on('connect',()=>{updateConnectionLabel('온라인 서버 연결됨 · 다른 사람과 방을 만들 수 있습니다.',true); onlineSocket.emit('rooms:list');});
             onlineSocket.on('disconnect',()=>{updateConnectionLabel('서버 연결이 끊겼습니다. 재연결 중입니다.'); remotePlayers.clear();});
-            onlineSocket.on('connect_error',()=>updateConnectionLabel('서버에 연결할 수 없습니다. 배포된 서버 주소에서 접속했는지 확인하세요.'));
+            onlineSocket.on('connect_error',()=>updateConnectionLabel('서버에 연결할 수 없습니다. 주소가 맞는지, Render 상태가 Live인지 확인하세요.'));
             onlineSocket.on('rooms:list',renderOnlineRooms);
             onlineSocket.on('rooms:update',renderOnlineRooms);
             onlineSocket.on('room:joined',data=>{
@@ -1123,6 +1412,17 @@
                 document.getElementById('btn-leave-room').disabled=false;
                 renderRoomState(data);
                 renderOnlineRooms(data.rooms||[]);
+                if (data.isHost && !data.started) {
+                    waitingRoomPracticeActive = true;
+                    const requestedStage = Number.isInteger(data.stageIndex) ? Math.max(0, Math.min(1100, data.stageIndex)) : 0;
+                    const requestedStageNumber = 100 - requestedStage;
+                    const practiceStageNumber = requestedStageNumber < 0 ? 100 : Math.max(0, Math.min(100, requestedStageNumber));
+                    const practiceStageIndex = 100 - practiceStageNumber;
+                    document.getElementById('online-modal').classList.add('hidden');
+                    startStage(practiceStageIndex, 'boss');
+                    updateOnlineWaitingBanner(data);
+                    showToast(`방 ${data.code} 생성 완료! 보스 ${practiceStageNumber} 연습 중 · 참가자가 들어오면 온라인 경기가 시작됩니다.`);
+                }
             });
             onlineSocket.on('room:state',renderRoomState);
             onlineSocket.on('room:error',data=>setOnlineStatus(data.message||'온라인 방 오류'));
@@ -1134,8 +1434,10 @@
             });
             onlineSocket.on('game:start',data=>{
                 const idx=Number.isInteger(data.stageIndex)?Math.max(0,Math.min(1100,data.stageIndex)):0;
+                waitingRoomPracticeActive = false;
+                updateOnlineWaitingBanner({ ...(currentOnlineRoom || {}), started: true });
                 document.getElementById('online-modal').classList.add('hidden');
-                if(!isGameRunning || currentSeqIdx!==idx) startStage(idx);
+                if(!isGameRunning || currentSeqIdx!==idx || activeGameMode !== 'online') startStage(idx, 'online');
                 const spawn = data.spawns && data.spawns[onlineSocket.id];
                 if (spawn && player) {
                     player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, Number(spawn.x) * canvas.width));
@@ -1152,7 +1454,7 @@
             rooms.forEach(room=>{
                 const row=document.createElement('div');row.className='flex items-center justify-between gap-2 rounded-xl bg-slate-900 border border-slate-700 p-3';
                 const info=document.createElement('div');const title=document.createElement('b');title.className='text-cyan-200';title.textContent=room.name||'아쿠아 방';
-                const meta=document.createElement('div');meta.className='text-slate-400 mt-1';meta.textContent=`공개 방 · ${room.players}/${room.maxPlayers || 7}명`;
+                const meta=document.createElement('div');meta.className='text-slate-400 mt-1';meta.textContent=`보스 연습 대기 중 · ${room.players}/${room.maxPlayers || 7}명 · 스테이지 ${room.stageNumber ?? '선택'}`;
                 info.append(title,meta);const join=document.createElement('button');join.className='liquid-btn px-3 py-2 rounded-lg font-black';join.textContent='입장';join.disabled=room.players >= (room.maxPlayers || 7) || !!room.started;
                 join.addEventListener('click',()=>joinRoom(room.code));row.append(info,join);list.appendChild(row);
             });
@@ -1161,9 +1463,12 @@
         function createRoom(){
             if(!onlineSocket||!onlineSocket.connected){setOnlineStatus('온라인 서버 연결이 필요합니다.');connectOnline();return;}
             const nick=(document.getElementById('player-nickname-input').value||'아쿠아영웅').trim().slice(0,12);
-            const stageNumber=Math.max(-1000,Math.min(100,Math.trunc(Number(document.getElementById('online-stage-number').value)||0)));
-            document.getElementById('online-stage-number').value=String(stageNumber);
-            onlineSocket.emit('room:create',{name:`${nick}의 방`,nickname:nick,stageIndex:100-stageNumber,isPublic:document.getElementById('room-public-toggle').checked});
+            const stageNumber = Math.max(-1000, Math.min(100, Math.trunc(Number(document.getElementById('online-stage-number').value) || 0)));
+            document.getElementById('online-stage-number').value = String(stageNumber);
+            const publicToggle = document.getElementById('room-public-toggle');
+            const isPublic = publicToggle ? publicToggle.checked : true;
+            setOnlineStatus('공개 방 생성 중입니다. 생성되면 보스 연습이 시작됩니다...');
+            onlineSocket.emit('room:create',{name:`${nick}의 방`,nickname:nick,stageIndex:100-stageNumber,isPublic});
         }
         function joinRoom(code){
             if(!onlineSocket||!onlineSocket.connected){setOnlineStatus('온라인 서버 연결이 필요합니다.');connectOnline();return;}
@@ -1173,6 +1478,8 @@
         }
         function leaveOnlineRoom(){
             if(onlineSocket&&onlineRoomCode) onlineSocket.emit('room:leave');
+            waitingRoomPracticeActive = false;
+            document.getElementById('online-waiting-banner')?.classList.add('hidden');
             currentOnlineRoom=null;onlineRoomCode=null;onlineIsHost=false;onlineRoomMembers=[];remotePlayers.clear();
             document.getElementById('btn-online-start').disabled=true;document.getElementById('btn-leave-room').disabled=true;
             document.getElementById('online-room-members').textContent='아직 방에 입장하지 않았습니다.';
@@ -1185,6 +1492,23 @@
             const now=performance.now();if(now-lastNetworkSend<50)return;lastNetworkSend=now;
             onlineSocket.emit('game:state',{x:player.x/canvas.width,y:player.y/canvas.height,radius:player.radius,name:player.name,color:player.color,landColor:player.landColor,stageIndex:currentSeqIdx});
         }
+        const serverUrlInput = document.getElementById('online-server-url');
+        if (serverUrlInput) serverUrlInput.value = onlineServerUrl;
+        document.getElementById('btn-apply-server-url').addEventListener('click',()=>{
+            const raw = (serverUrlInput.value || '').trim();
+            try {
+                const parsed = new URL(raw);
+                if (!['https:', 'http:'].includes(parsed.protocol) || !parsed.hostname) throw new Error('invalid URL');
+                onlineServerUrl = parsed.origin;
+                try { localStorage.setItem(SERVER_URL_STORAGE_KEY, onlineServerUrl); } catch (e) { /* optional save */ }
+                if (onlineSocket) { onlineSocket.disconnect(); onlineSocket = null; }
+                remotePlayers.clear();
+                updateConnectionLabel('서버 주소 적용됨. 연결을 시도합니다...');
+                connectOnline();
+            } catch (e) {
+                updateConnectionLabel('https://로 시작하는 Render 공개 주소를 입력해 주세요.');
+            }
+        });
         document.getElementById('btn-online-entry').addEventListener('click',()=>{
             document.getElementById('start-screen').classList.add('hidden');document.getElementById('online-modal').classList.remove('hidden');connectOnline();refreshRooms();
         });
@@ -1195,13 +1519,36 @@
         document.getElementById('btn-online-start').addEventListener('click',()=>{
             if(!onlineSocket||!onlineRoomCode){setOnlineStatus('먼저 방에 입장하세요.');return;}
             if(!onlineIsHost){setOnlineStatus('경기 시작은 방장만 할 수 있습니다.');return;}
+            if(onlineRoomMembers.length < 2){setOnlineStatus('최소 2명이 방에 입장해야 시작할 수 있습니다.');return;}
             const stageNumber = Math.trunc(Number(document.getElementById('online-stage-number').value));
             if (!Number.isFinite(stageNumber) || stageNumber < -1000 || stageNumber > 100) { setOnlineStatus('온라인 스테이지는 100부터 -1000 사이로 입력하세요.'); return; }
-            if (onlineRoomMembers.length < 2) { setOnlineStatus('최소 2명이 방에 입장해야 시작할 수 있습니다.'); return; }
             onlineSocket.emit('game:start',{stageIndex:100-stageNumber});
             setOnlineStatus('경기 시작 신호를 보내는 중입니다...');
         });
         document.getElementById('btn-leave-room').addEventListener('click',leaveOnlineRoom);
+        document.getElementById('btn-copy-waiting-room-code').addEventListener('click', async () => {
+            if (!onlineRoomCode) return;
+            try {
+                if (navigator.clipboard?.writeText) await navigator.clipboard.writeText(onlineRoomCode);
+                else throw new Error('clipboard unavailable');
+                showToast(`방 코드 ${onlineRoomCode} 복사 완료!`);
+            } catch (e) {
+                const field = document.createElement('textarea');
+                field.value = onlineRoomCode;
+                field.style.position = 'fixed'; field.style.opacity = '0';
+                document.body.appendChild(field); field.select();
+                try { document.execCommand('copy'); showToast(`방 코드 ${onlineRoomCode} 복사 완료!`); }
+                catch (_) { showToast(`친구에게 방 코드 ${onlineRoomCode}를 알려주세요.`); }
+                field.remove();
+            }
+        });
+        document.getElementById('btn-cancel-waiting-room').addEventListener('click', () => {
+            isGameRunning = false; paused = false;
+            leaveOnlineRoom();
+            document.getElementById('end-screen').classList.add('hidden');
+            document.getElementById('start-screen').classList.remove('hidden');
+            showToast('온라인 대기를 취소했습니다.');
+        });
 
         document.getElementById('btn-main-space').addEventListener('click',()=>{
             isGameRunning=false;paused=false;leaveOnlineRoom();document.getElementById('pause-overlay').classList.add('hidden');document.getElementById('end-screen').classList.add('hidden');document.getElementById('stage-modal').classList.add('hidden');document.getElementById('shop-modal').classList.add('hidden');document.getElementById('online-modal').classList.add('hidden');document.getElementById('start-screen').classList.remove('hidden');saveGame();
