@@ -29,7 +29,7 @@ function roomList() {
   // 공개로 표시한 대기 방만 다른 이용자에게 노출한다.
   return [...rooms.values()]
     // 공개 여부를 명시적으로 false로 끄지 않은 방은 공개 대기방 목록에 표시한다.
-    .filter(room => room.isPublic !== false && !room.started && room.players.size < MAX_ROOM_PLAYERS)
+    .filter(room => room.isPublic !== false && room.players.size < MAX_ROOM_PLAYERS)
     .map(room => ({
       code: room.code,
       name: room.name,
@@ -37,7 +37,8 @@ function roomList() {
       maxPlayers: MAX_ROOM_PLAYERS,
       stageIndex: room.stageIndex,
       stageNumber: 100 - room.stageIndex,
-      started: room.started
+      started: room.started,
+      status: room.started ? 'in-progress' : 'waiting'
     }));
 }
 
@@ -71,6 +72,7 @@ function leave(socket) {
   if (room) {
     const wasHost = room.hostId === socket.id;
     room.players.delete(socket.id);
+    if (room.spawns) delete room.spawns[socket.id];
     socket.leave(code);
     if (room.players.size === 0) {
       rooms.delete(code);
@@ -99,6 +101,7 @@ function startRoomGame(room, selectedStageIndex = room.stageIndex) {
   room.started = true;
   const spawns = {};
   [...room.players.keys()].forEach((id, index) => { spawns[id] = SPAWN_POINTS[index]; });
+  room.spawns = spawns;
   io.to(room.code).emit('game:start', {
     stageIndex: room.stageIndex,
     stageNumber: 100 - room.stageIndex,
@@ -110,7 +113,6 @@ function startRoomGame(room, selectedStageIndex = room.stageIndex) {
 }
 
 function enter(socket, room, nickname) {
-  if (room.started) return socket.emit('room:error', { message: '이미 시작한 방에는 입장할 수 없습니다.' });
   if (room.players.size >= MAX_ROOM_PLAYERS) {
     return socket.emit('room:error', { message: `이 방은 최대 ${MAX_ROOM_PLAYERS}명까지 입장할 수 있습니다.` });
   }
@@ -126,6 +128,7 @@ function enter(socket, room, nickname) {
     code: room.code,
     name: room.name,
     isHost: room.hostId === socket.id,
+    role: room.hostId === socket.id ? 'host' : 'player',
     hostId: room.hostId,
     isPublic: room.isPublic,
     autoStartOnJoin: room.autoStartOnJoin,
@@ -138,8 +141,24 @@ function enter(socket, room, nickname) {
   socket.to(room.code).emit('room:member-joined', player);
   publishRoomState(room);
   publishRooms();
-  // 새 방은 두 번째 참가자가 들어오는 즉시 함께 온라인 경기로 이동한다.
-  if (room.autoStartOnJoin && room.players.size >= 2) startRoomGame(room);
+  if (room.started) {
+    // 이미 시작한 경기에도 빈 플레이어 슬롯으로 늦게 참가할 수 있습니다.
+    const used = new Set(Object.values(room.spawns || {}).map(point => `${point.x},${point.y}`));
+    const spawn = SPAWN_POINTS.find(point => !used.has(`${point.x},${point.y}`));
+    if (spawn) {
+      room.spawns = room.spawns || {};
+      room.spawns[socket.id] = spawn;
+      socket.emit('game:start', {
+        stageIndex: room.stageIndex,
+        stageNumber: 100 - room.stageIndex,
+        spawns: room.spawns,
+        lateJoin: true
+      });
+    }
+  } else if (room.autoStartOnJoin && room.players.size >= 2) {
+    // 새 방은 두 번째 참가자가 들어오는 즉시 함께 온라인 경기로 이동한다.
+    startRoomGame(room);
+  }
 }
 
 io.on('connection', socket => {
@@ -170,8 +189,11 @@ io.on('connection', socket => {
     const code = String(data?.code || '').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
     const room = rooms.get(code);
     if (!room) return socket.emit('room:error', { message: '방을 찾을 수 없습니다. 초대 코드를 확인해 주세요.' });
-    if (room.started) return socket.emit('room:error', { message: '이미 시작한 방에는 입장할 수 없습니다.' });
-    if (socketRoom.get(socket.id) === code) { publishRoomState(room); return; }
+    if (socketRoom.get(socket.id) === code) {
+      publishRoomState(room);
+      if (room.started && room.spawns?.[socket.id]) socket.emit('game:start', { stageIndex: room.stageIndex, stageNumber: 100 - room.stageIndex, spawns: room.spawns, lateJoin: true });
+      return;
+    }
     if (room.players.size >= MAX_ROOM_PLAYERS) {
       return socket.emit('room:error', { message: `이 방은 최대 ${MAX_ROOM_PLAYERS}명까지 입장할 수 있습니다.` });
     }
