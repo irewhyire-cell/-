@@ -95,7 +95,7 @@ function makeCode() {
 }
 
 function startRoomGame(room, selectedStageIndex = room.stageIndex) {
-  if (!room || room.started || room.players.size < 2) return false;
+  if (!room || room.started || room.players.size < 1) return false;
   const rawIndex = Number(selectedStageIndex);
   room.stageIndex = Number.isFinite(rawIndex) ? Math.max(0, Math.min(1100, Math.trunc(rawIndex))) : room.stageIndex;
   room.started = true;
@@ -157,8 +157,8 @@ function enter(socket, room, nickname) {
         lateJoin: true
       });
     }
-  } else if (room.autoStartOnJoin && room.players.size >= 2) {
-    // 새 방은 두 번째 참가자가 들어오는 즉시 함께 온라인 경기로 이동한다.
+  } else if (room.autoStartOnJoin && room.players.size >= 1) {
+    // 방에 들어온 즉시 온라인 경기를 시작하고, 이후 참가자는 진행 중인 게임에 합류한다.
     startRoomGame(room);
   }
 }
