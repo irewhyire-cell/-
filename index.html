@@ -660,6 +660,8 @@
         let aiEntities = [];
         let remotePlayers = new Map();
         let onlineSocket = null;
+        // 방 만들기/참가 버튼을 서버 연결 전에 눌러도 요청을 보관했다가 연결 직후 전송합니다.
+        let pendingOnlineAction = null;
         let onlineRoomCode = null;
         let onlineIsHost = false;
         let onlineRoomMembers = [];
@@ -1427,15 +1429,19 @@
         window.addEventListener('keyup', (e) => keys[e.code] = false);
         window.addEventListener('beforeunload', saveGame);
 
-        // Socket.IO online transport. Hosted pages use their own origin; downloaded HTML uses the Render URL below.
+        // 온라인 게임 서버 주소. 게임 화면이 GitHub Pages/로컬 파일 등 다른 곳에서 열려도
+        // Socket.IO는 Render 서버로 연결합니다. Render에서 직접 열면 같은 출처를 사용합니다.
         const DEFAULT_RENDER_SERVER_URL = 'https://aqua-wars-online.onrender.com';
-        const SERVER_URL_STORAGE_KEY = 'aquaWarsOnlineServerUrl_v1';
+        const SERVER_URL_STORAGE_KEY = 'aquaWarsOnlineServerUrl_v2';
         let onlineServerUrl = (() => {
             try {
                 const saved = localStorage.getItem(SERVER_URL_STORAGE_KEY);
                 if (saved) return new URL(saved).origin;
             } catch (e) { /* local file storage may be unavailable */ }
-            return location.protocol === 'file:' ? DEFAULT_RENDER_SERVER_URL : location.origin;
+            try {
+                return location.origin === new URL(DEFAULT_RENDER_SERVER_URL).origin
+                    ? location.origin : DEFAULT_RENDER_SERVER_URL;
+            } catch (e) { return DEFAULT_RENDER_SERVER_URL; }
         })();
         let currentOnlineRoom = null;
         let waitingRoomPracticeActive = false;
@@ -1484,13 +1490,39 @@
             updateOnlineWaitingBanner(data);
         }
         function connectOnline() {
-            if (typeof io !== 'function') { updateConnectionLabel('온라인 연결 도구를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.'); return; }
-            if (onlineSocket) return;
-            const targetUrl = location.protocol === 'file:' ? onlineServerUrl : (onlineServerUrl || location.origin);
-            onlineSocket = io(targetUrl, {transports:['websocket','polling'], reconnection:true, reconnectionAttempts:8, timeout:12000});
-            onlineSocket.on('connect',()=>{updateConnectionLabel('온라인 서버 연결됨 · 다른 사람과 방을 만들 수 있습니다.',true); onlineSocket.emit('rooms:list');});
-            onlineSocket.on('disconnect',()=>{updateConnectionLabel('서버 연결이 끊겼습니다. 재연결 중입니다.'); remotePlayers.clear();});
-            onlineSocket.on('connect_error',()=>updateConnectionLabel('서버에 연결할 수 없습니다. 주소가 맞는지, Render 상태가 Live인지 확인하세요.'));
+            if (typeof io !== 'function') {
+                updateConnectionLabel('온라인 연결 도구를 불러오지 못했습니다. 인터넷 연결을 확인하고 새로고침해 주세요.');
+                return;
+            }
+            if (onlineSocket) return; // 이미 연결 중이거나 자동 재연결 중입니다.
+            const targetUrl = onlineServerUrl || DEFAULT_RENDER_SERVER_URL;
+            // polling으로 먼저 연결하고 websocket으로 업그레이드합니다. 일부 모바일/공용망에서
+            // websocket이 차단되더라도 polling으로 참가할 수 있도록 fallback을 허용합니다.
+            onlineSocket = io(targetUrl, {
+                transports: ['polling', 'websocket'],
+                tryAllTransports: true,
+                upgrade: true,
+                reconnection: true,
+                reconnectionAttempts: Infinity,
+                reconnectionDelay: 800,
+                reconnectionDelayMax: 5000,
+                timeout: 20000
+            });
+            onlineSocket.on('connect',()=>{
+                updateConnectionLabel(`온라인 서버 연결됨 · ${targetUrl}`,true);
+                onlineSocket.emit('rooms:list');
+                if (pendingOnlineAction) {
+                    const action = pendingOnlineAction;
+                    pendingOnlineAction = null;
+                    setOnlineStatus(action.sendingMessage);
+                    onlineSocket.emit(action.event, action.data);
+                }
+            });
+            onlineSocket.on('disconnect',()=>{updateConnectionLabel('서버 연결이 끊겼습니다. 자동으로 다시 연결합니다.'); remotePlayers.clear();});
+            onlineSocket.on('connect_error',(err)=>{
+                const detail = err && err.message ? ` (${err.message})` : '';
+                updateConnectionLabel(`서버 연결 실패${detail} · 주소: ${targetUrl}`);
+            });
             onlineSocket.on('rooms:list',renderOnlineRooms);
             onlineSocket.on('rooms:update',renderOnlineRooms);
             onlineSocket.on('room:joined',data=>{
@@ -1569,24 +1601,38 @@
             });
         }
         function refreshRooms(){ if(!onlineSocket||!onlineSocket.connected){connectOnline();setOnlineStatus('서버에 연결하는 중입니다...');return;} onlineSocket.emit('rooms:list'); }
+        function emitOnlineActionWhenReady(event, data, sendingMessage) {
+            if (onlineSocket && onlineSocket.connected) {
+                setOnlineStatus(sendingMessage);
+                onlineSocket.emit(event, data);
+                return true;
+            }
+            if (pendingOnlineAction) {
+                setOnlineStatus('이전 요청을 서버에 전달하는 중입니다. 연결되면 자동으로 처리됩니다.');
+                connectOnline();
+                return false;
+            }
+            pendingOnlineAction = { event, data, sendingMessage };
+            setOnlineStatus('온라인 서버에 연결하는 중입니다. 연결되면 요청이 자동으로 전송됩니다...');
+            connectOnline();
+            return false;
+        }
         function createRoom(){
-            if(!onlineSocket||!onlineSocket.connected){setOnlineStatus('온라인 서버 연결이 필요합니다.');connectOnline();return;}
             const nick=(document.getElementById('player-nickname-input').value||'아쿠아영웅').trim().slice(0,12);
             const stageNumber = Math.max(-1000, Math.min(100, Math.trunc(Number(document.getElementById('online-stage-number').value) || 0)));
             document.getElementById('online-stage-number').value = String(stageNumber);
             const publicToggle = document.getElementById('room-public-toggle');
             const isPublic = publicToggle ? publicToggle.checked : true;
-            setOnlineStatus('공개 방 생성 중입니다. 생성되면 보스 연습이 시작됩니다...');
             const maxPlayers = Math.max(2, Math.min(7, Math.trunc(Number(document.getElementById('room-max-players')?.value) || 7)));
-            onlineSocket.emit('room:create',{name:`${nick}의 방`,nickname:nick,stageIndex:100-stageNumber,isPublic,maxPlayers});
+            emitOnlineActionWhenReady('room:create', {
+                name:`${nick}의 방`, nickname:nick, stageIndex:100-stageNumber, isPublic, maxPlayers
+            }, '방 생성 요청을 전송했습니다...');
         }
         function joinRoom(code){
-            if(!onlineSocket||!onlineSocket.connected){setOnlineStatus('온라인 서버 연결이 필요합니다. 잠시 후 다시 입장해 주세요.');connectOnline();return;}
             code=String(code||'').trim().toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,8);
             if(!code){setOnlineStatus('방 코드를 입력하세요.');return;}
             const nick=(document.getElementById('player-nickname-input').value||'아쿠아영웅').trim().slice(0,12);
-            setOnlineStatus(`방 ${code}에 플레이어로 입장하는 중입니다...`);
-            onlineSocket.emit('room:join',{code,nickname:nick});
+            emitOnlineActionWhenReady('room:join', {code,nickname:nick}, `방 ${code} 참가 요청을 전송했습니다...`);
         }
         function leaveOnlineRoom(){
             if(onlineSocket&&onlineRoomCode) onlineSocket.emit('room:leave');
