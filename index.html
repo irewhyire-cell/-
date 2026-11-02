@@ -215,7 +215,7 @@
                 <button id="btn-close-online" class="text-slate-400 hover:text-white text-xl p-1"><i class="fa-solid fa-xmark"></i></button>
             </div>
             <div class="rounded-xl bg-slate-900 border border-cyan-500/30 p-3 text-xs text-cyan-100 leading-relaxed">
-                <span id="online-connection-status">서버 연결 확인 중...</span><br>방당 최대 1명까지 입장할 수 있습니다.
+                <span id="online-connection-status">서버 연결 확인 중...</span><br>비공개 방입니다. 초대 코드가 있는 지인만 참여할 수 있으며, 방당 최대 7명까지 입장할 수 있습니다.
             </div>
             <div class="grid grid-cols-2 gap-2">
                 <button id="btn-create-room" class="liquid-btn rounded-xl p-3 font-black text-sm">＋ 방 만들기</button>
@@ -1089,7 +1089,7 @@
                 currentOnlineRoom=data; onlineRoomCode=data.code; onlineIsHost=!!data.isHost;
                 onlineRoomMembers=data.players||[]; remotePlayers.clear();
                 document.getElementById('room-code-input').value=data.code;
-                setOnlineStatus(`방 ${data.code} 입장 완료 · ${onlineRoomMembers.length}/1명 · ${onlineIsHost?'방장':'참가자'}`);
+                setOnlineStatus(`비공개 방 ${data.code} 입장 완료 · ${onlineRoomMembers.length}/${data.maxPlayers || 7}명 · ${onlineIsHost?'방장':'참가자'}`);
                 document.getElementById('btn-online-start').disabled=!onlineIsHost;
                 document.getElementById('btn-online-start').textContent=onlineIsHost?'온라인 경기 시작 (방장)':'방장이 경기를 시작할 때까지 기다리세요';
                 document.getElementById('btn-leave-room').disabled=false;
@@ -1111,11 +1111,11 @@
         function renderOnlineRooms(rooms) {
             const list=document.getElementById('room-list'); if(!list)return;
             list.innerHTML='';
-            if(!Array.isArray(rooms)||!rooms.length){list.innerHTML='<p class="text-slate-500">열린 방이 없습니다. 새 방을 만들어 보세요.</p>';return;}
+            if(!Array.isArray(rooms)||!rooms.length){list.innerHTML='<p class="text-slate-500">비공개 방은 목록에 표시되지 않습니다. 친구가 만든 방의 초대 코드를 입력해 입장하세요.</p>';return;}
             rooms.forEach(room=>{
                 const row=document.createElement('div');row.className='flex items-center justify-between gap-2 rounded-xl bg-slate-900 border border-slate-700 p-3';
                 const info=document.createElement('div');const title=document.createElement('b');title.className='text-cyan-200';title.textContent=room.name||'아쿠아 방';
-                const meta=document.createElement('div');meta.className='text-slate-400 mt-1';meta.textContent=`코드: ${room.code} · ${room.players}/1명`;
+                const meta=document.createElement('div');meta.className='text-slate-400 mt-1';meta.textContent=`코드: ${room.code} · ${room.players}/${room.maxPlayers || 7}명`;
                 info.append(title,meta);const join=document.createElement('button');join.className='liquid-btn px-3 py-2 rounded-lg font-black';join.textContent='입장';join.disabled=room.players>=1;
                 join.addEventListener('click',()=>joinRoom(room.code));row.append(info,join);list.appendChild(row);
             });
