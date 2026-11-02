@@ -1,8 +1,8 @@
 {
   "name": "aqua-wars-online-server",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
-  "description": "AQUA WARS online lobby with host-selected room capacity and late joining",
+  "description": "AQUA WARS online lobby with configurable player limits, late joining and iOS/Android touch support",
   "main": "server.js",
   "scripts": { "start": "node server.js" },
   "engines": { "node": ">=20" },
