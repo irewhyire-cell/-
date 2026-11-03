@@ -670,6 +670,9 @@
         let bossKraken = null;
         let aiEntities = [];
         let remotePlayers = new Map();
+        let onlineTerritoryId = null;
+        let pendingOnlineMapSnapshot = null;
+        let onlineMapRandom = null;
         let onlineSocket = null;
         // 방 만들기/참가 버튼을 서버 연결 전에 눌러도 요청을 보관했다가 연결 직후 전송합니다.
         let pendingOnlineAction = null;
@@ -764,6 +767,33 @@
         joystickContainer.addEventListener('mousedown', (e) => { joystickActive = true; handleJoystickMove(e.clientX, e.clientY); });
         window.addEventListener('mousemove', (e) => { if (joystickActive) handleJoystickMove(e.clientX, e.clientY); });
         window.addEventListener('mouseup', resetJoystick);
+
+        function createSeededRandom(seed) {
+            let state = seed >>> 0;
+            return function() {
+                state = (state + 0x6D2B79F5) >>> 0;
+                let t = state;
+                t = Math.imul(t ^ (t >>> 15), t | 1);
+                t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+                return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+            };
+        }
+        function resetOnlineMapRandom(stageIndex) {
+            if (activeGameMode !== 'online' || !onlineRoomCode) {
+                onlineMapRandom = null;
+                return;
+            }
+            let seed = 2166136261;
+            const seedText = `${onlineRoomCode}:${stageIndex}`;
+            for (let i = 0; i < seedText.length; i++) {
+                seed ^= seedText.charCodeAt(i);
+                seed = Math.imul(seed, 16777619);
+            }
+            onlineMapRandom = createSeededRandom(seed);
+        }
+        function mapRandom() {
+            return activeGameMode === 'online' && onlineMapRandom ? onlineMapRandom() : Math.random();
+        }
 
         function initCanvasSize() {
             const viewportWidth = window.visualViewport?.width || window.innerWidth;
@@ -889,6 +919,7 @@
             currentSeqIdx = Math.max(0, Math.min(seqIndex, LEVEL_CONFIGS.length - 1));
             paused = false;
             const cfg = LEVEL_CONFIGS[currentSeqIdx];
+            resetOnlineMapRandom(currentSeqIdx);
 
             grid = Array.from({ length: ROWS }, () => Array(COLS).fill(0));
             wildDrops = []; fieldCoins = []; particles = []; projectiles = []; aiEntities = [];
@@ -896,6 +927,7 @@
 
             const nick = document.getElementById('player-nickname-input').value.trim() || '아쿠아영웅';
             player = new WaterEntity(nick, selectedSkin.color, selectedSkin.landColor, canvas.width / 2, canvas.height * 0.8, true, 1);
+            if (activeGameMode === 'online' && onlineTerritoryId) player.id = onlineTerritoryId;
 
             const bossContainer = document.getElementById('boss-hp-container');
             const isBossBattle = isBossBattleForCurrentMode(cfg);
@@ -931,13 +963,13 @@
 
         function spawnWildDrops(count) {
             for (let i = 0; i < count; i++) {
-                wildDrops.push({ x: Math.random() * (canvas.width - 40) + 20, y: Math.random() * (canvas.height - 40) + 20, mass: 15, radius: 5 });
+                wildDrops.push({ x: mapRandom() * (canvas.width - 40) + 20, y: mapRandom() * (canvas.height - 40) + 20, mass: 15, radius: 5 });
             }
         }
 
         function spawnFieldCoins(count) {
             for (let i = 0; i < count; i++) {
-                fieldCoins.push({ x: Math.random() * (canvas.width - 40) + 20, y: Math.random() * (canvas.height - 40) + 20, value: 10, radius: 6 });
+                fieldCoins.push({ x: mapRandom() * (canvas.width - 40) + 20, y: mapRandom() * (canvas.height - 40) + 20, value: 10, radius: 6 });
             }
         }
 
@@ -1056,11 +1088,14 @@
             for (let r = 0; r < ROWS; r++) {
                 for (let c = 0; c < COLS; c++) {
                     const owner = grid[r][c];
-                    if (owner === 1) { playerTileCount++; ctx.fillStyle = cfg.landColor; }
+                    if (player && owner === player.id) { playerTileCount++; ctx.fillStyle = cfg.landColor; }
                     else if (owner === 2) ctx.fillStyle = AI_CONFIGS[0].landColor;
                     else if (owner === 3) ctx.fillStyle = AI_CONFIGS[1].landColor;
                     else if (owner === 99) ctx.fillStyle = '#7f1d1d';
-                    else ctx.fillStyle = '#0f172a';
+                    else if (owner >= 4 && owner <= 10) {
+                        const remote = [...remotePlayers.values()].find(rp => Number(rp.territoryId) === owner);
+                        ctx.fillStyle = remote?.landColor || ['#0e7490','#7e22ce','#047857','#be185d','#9f1239','#a16207','#155e75'][owner - 4];
+                    } else ctx.fillStyle = '#0f172a';
                     ctx.fillRect(c * cellSize, r * cellSize, cellSize, cellSize);
                 }
             }
@@ -1330,6 +1365,7 @@
         }
         function startStage(idx, mode = selectedGameMode) {
             activeGameMode = mode || 'normal';
+            if (activeGameMode !== 'online') { onlineTerritoryId = null; pendingOnlineMapSnapshot = null; onlineMapRandom = null; }
             paused = false;
             document.getElementById('pause-overlay')?.classList.add('hidden');
             document.getElementById('stage-modal').classList.add('hidden');
@@ -1586,6 +1622,8 @@
             onlineSocket.on('room:joined',data=>{
                 currentOnlineRoom=data; onlineRoomCode=data.code; onlineIsHost=!!data.isHost;
                 onlineRoomMembers=data.players||[]; remotePlayers.clear();
+                onlineTerritoryId = Number(data.territoryId) || null;
+                pendingOnlineMapSnapshot = null;
                 document.getElementById('room-code-input').value=data.code;
                 document.getElementById('btn-leave-room').disabled=false;
                 renderRoomState(data);
@@ -1625,6 +1663,14 @@
             onlineSocket.on('game:state',state=>{
                 if(!state || state.id===onlineSocket.id) return;
                 remotePlayers.set(state.id,state);
+                claimOnlineRemoteTerritory(state);
+            });
+            onlineSocket.on('game:map-snapshot',snapshot=>{
+                if (!grid.length || activeGameMode !== 'online' || !isGameRunning) {
+                    pendingOnlineMapSnapshot = snapshot;
+                    return;
+                }
+                applyOnlineMapSnapshot(snapshot);
             });
             onlineSocket.on('game:start',data=>{
                 const idx=Number.isInteger(data.stageIndex)?Math.max(0,Math.min(1100,data.stageIndex)):0;
@@ -1635,9 +1681,15 @@
                 if(!isGameRunning || currentSeqIdx!==idx || activeGameMode !== 'online') startStage(idx, 'online');
                 const spawn = data.spawns && data.spawns[onlineSocket.id];
                 if (spawn && player) {
+                    onlineTerritoryId = Number(spawn.territoryId) || onlineTerritoryId || 4;
+                    player.id = onlineTerritoryId;
                     player.x = Math.max(player.radius, Math.min(canvas.width - player.radius, Number(spawn.x) * canvas.width));
                     player.y = Math.max(player.radius, Math.min(canvas.height - player.radius, Number(spawn.y) * canvas.height));
                     player.claimTerritory();
+                }
+                if (pendingOnlineMapSnapshot) {
+                    applyOnlineMapSnapshot(pendingOnlineMapSnapshot);
+                    pendingOnlineMapSnapshot = null;
                 }
                 setOnlineStatus(`온라인 경기 시작 · ${LEVEL_CONFIGS[idx].stageNumber}단계 · 방 ${onlineRoomCode}`);
             });
@@ -1693,6 +1745,9 @@
             if(onlineSocket&&onlineRoomCode) onlineSocket.emit('room:leave');
             onlineGameStarted = false;
             waitingRoomPracticeActive = false;
+            onlineTerritoryId = null;
+            pendingOnlineMapSnapshot = null;
+            onlineMapRandom = null;
             document.getElementById('online-waiting-banner')?.classList.add('hidden');
             currentOnlineRoom=null;onlineRoomCode=null;onlineIsHost=false;onlineRoomMembers=[];remotePlayers.clear();
             document.getElementById('online-live-roster')?.classList.add('hidden');
@@ -1702,10 +1757,45 @@
             document.getElementById('btn-online-start').textContent='2명 이상 모이면 시작할 수 있습니다';
             setOnlineStatus('방에서 나왔습니다.');
         }
+        function claimOnlineRemoteTerritory(rp) {
+            const owner = Math.trunc(Number(rp?.territoryId));
+            if (owner < 4 || owner > 10 || !grid.length) return;
+            const x = Number(rp.x) * canvas.width;
+            const y = Number(rp.y) * canvas.height;
+            if (!Number.isFinite(x) || !Number.isFinite(y)) return;
+            const radius = Math.max(12, Math.min(28, (Number(rp.radius) || 18) * canvas.width / 600));
+            const gx = Math.floor(x / cellSize);
+            const gy = Math.floor(y / cellSize);
+            const tileRadius = Math.ceil(radius / cellSize);
+            for (let dy = -tileRadius; dy <= tileRadius; dy++) {
+                for (let dx = -tileRadius; dx <= tileRadius; dx++) {
+                    const nx = gx + dx, ny = gy + dy;
+                    if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && Math.hypot(dx, dy) <= tileRadius) {
+                        grid[ny][nx] = owner;
+                    }
+                }
+            }
+        }
+        function applyOnlineMapSnapshot(snapshot) {
+            const players = Array.isArray(snapshot?.players) ? snapshot.players : [];
+            players.forEach(entry => {
+                if (!entry || entry.id === onlineSocket?.id) return;
+                const latest = {
+                    id: entry.id, name: entry.name, territoryId: entry.territoryId,
+                    x: entry.x, y: entry.y, radius: entry.radius,
+                    color: entry.color, landColor: entry.landColor
+                };
+                remotePlayers.set(entry.id, latest);
+                (Array.isArray(entry.trail) ? entry.trail : []).forEach(point => {
+                    claimOnlineRemoteTerritory({ ...latest, ...point });
+                });
+                claimOnlineRemoteTerritory(latest);
+            });
+        }
         function sendOnlineState(){
             if(!onlineGameStarted||!onlineSocket||!onlineSocket.connected||!onlineRoomCode||!player||!isGameRunning)return;
             const now=performance.now();if(now-lastNetworkSend<50)return;lastNetworkSend=now;
-            onlineSocket.emit('game:state',{x:player.x/canvas.width,y:player.y/canvas.height,radius:player.radius,name:player.name,color:player.color,landColor:player.landColor,stageIndex:currentSeqIdx});
+            onlineSocket.emit('game:state',{x:player.x/canvas.width,y:player.y/canvas.height,radius:player.radius,name:player.name,color:player.color,landColor:player.landColor,stageIndex:currentSeqIdx,territoryId:player.id});
         }
         const serverUrlInput = document.getElementById('online-server-url');
         if (serverUrlInput) serverUrlInput.value = onlineServerUrl;
