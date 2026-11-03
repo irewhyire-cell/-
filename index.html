@@ -1666,11 +1666,7 @@
                 claimOnlineRemoteTerritory(state);
             });
             onlineSocket.on('game:map-snapshot',snapshot=>{
-                if (!grid.length || activeGameMode !== 'online' || !isGameRunning) {
-                    pendingOnlineMapSnapshot = snapshot;
-                    return;
-                }
-                applyOnlineMapSnapshot(snapshot);
+                pendingOnlineMapSnapshot = snapshot;
             });
             onlineSocket.on('game:start',data=>{
                 const idx=Number.isInteger(data.stageIndex)?Math.max(0,Math.min(1100,data.stageIndex)):0;
@@ -1678,7 +1674,7 @@
                 waitingRoomPracticeActive = false;
                 updateOnlineWaitingBanner({ ...(currentOnlineRoom || {}), started: true });
                 document.getElementById('online-modal').classList.add('hidden');
-                if(!isGameRunning || currentSeqIdx!==idx || activeGameMode !== 'online') startStage(idx, 'online');
+                if(data.lateJoin || !isGameRunning || currentSeqIdx!==idx || activeGameMode !== 'online') startStage(idx, 'online');
                 const spawn = data.spawns && data.spawns[onlineSocket.id];
                 if (spawn && player) {
                     onlineTerritoryId = Number(spawn.territoryId) || onlineTerritoryId || 4;
