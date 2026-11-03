@@ -229,7 +229,13 @@ io.on('connection', socket => {
     if (!room) return socket.emit('room:error', { message: '방을 찾을 수 없습니다. 초대 코드를 확인해 주세요.' });
     if (socketRoom.get(socket.id) === code) {
       publishRoomState(room);
-      if (room.started && room.spawns?.[socket.id]) socket.emit('game:start', { stageIndex: room.stageIndex, stageNumber: 100 - room.stageIndex, spawns: room.spawns, lateJoin: true });
+      if (room.started && room.spawns?.[socket.id]) {
+        const snapshotPlayers = [...room.players.values()]
+          .filter(member => member.id !== socket.id && member.lastState)
+          .map(member => ({ ...member.lastState, trail: (member.trail || []).slice(-1800) }));
+        socket.emit('game:map-snapshot', { players: snapshotPlayers });
+        socket.emit('game:start', { stageIndex: room.stageIndex, stageNumber: 100 - room.stageIndex, spawns: room.spawns, lateJoin: true });
+      }
       return;
     }
     const roomMaxPlayers = room.maxPlayers || MAX_ROOM_PLAYERS;
