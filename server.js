@@ -10,6 +10,7 @@ const PORT = process.env.PORT || 3000;
 const rooms = new Map();
 const socketRoom = new Map();
 const MAX_ROOM_PLAYERS = 7;
+const ONLINE_TERRITORY_IDS = [4, 5, 6, 7, 8, 9, 10];
 
 const SPAWN_POINTS = [
   { x: 0.12, y: 0.78 },
@@ -51,7 +52,11 @@ function publishRoomState(room) {
     code: room.code,
     name: room.name,
     hostId: room.hostId,
-    players: [...room.players.values()],
+    players: [...room.players.values()].map(player => ({
+      id: player.id,
+      name: player.name,
+      territoryId: player.territoryId
+    })),
     maxPlayers: room.maxPlayers || MAX_ROOM_PLAYERS,
     stageIndex: room.stageIndex,
     stageNumber: 100 - room.stageIndex,
@@ -100,7 +105,11 @@ function startRoomGame(room, selectedStageIndex = room.stageIndex) {
   room.stageIndex = Number.isFinite(rawIndex) ? Math.max(0, Math.min(1100, Math.trunc(rawIndex))) : room.stageIndex;
   room.started = true;
   const spawns = {};
-  [...room.players.keys()].forEach((id, index) => { spawns[id] = SPAWN_POINTS[index]; });
+  for (const player of room.players.values()) {
+    const spawnIndex = ONLINE_TERRITORY_IDS.indexOf(player.territoryId);
+    const point = SPAWN_POINTS[spawnIndex >= 0 ? spawnIndex : 0];
+    spawns[player.id] = { ...point, territoryId: player.territoryId };
+  }
   room.spawns = spawns;
   io.to(room.code).emit('game:start', {
     stageIndex: room.stageIndex,
@@ -119,9 +128,17 @@ function enter(socket, room, nickname) {
     return socket.emit('room:error', { message: `이 방은 최대 ${maxPlayers}명까지 입장할 수 있습니다.` });
   }
 
+  const usedTerritories = new Set([...room.players.values()].map(member => member.territoryId));
+  const territoryId = ONLINE_TERRITORY_IDS.find(id => !usedTerritories.has(id));
+  if (!territoryId) {
+    return socket.emit('room:error', { message: '이 방은 최대 7명까지 입장할 수 있습니다.' });
+  }
   const player = {
     id: socket.id,
-    name: String(nickname || '아쿠아영웅').trim().slice(0, 12) || '아쿠아영웅'
+    name: String(nickname || '아쿠아영웅').trim().slice(0, 12) || '아쿠아영웅',
+    territoryId,
+    trail: [],
+    lastState: null
   };
   room.players.set(socket.id, player);
   socketRoom.set(socket.id, room.code);
@@ -136,27 +153,41 @@ function enter(socket, room, nickname) {
     autoStartOnJoin: room.autoStartOnJoin,
     started: room.started,
     stageIndex: room.stageIndex,
-    players: [...room.players.values()],
+    players: [...room.players.values()].map(member => ({
+      id: member.id,
+      name: member.name,
+      territoryId: member.territoryId
+    })),
+    territoryId: player.territoryId,
     maxPlayers: room.maxPlayers || MAX_ROOM_PLAYERS,
     rooms: roomList()
   });
-  socket.to(room.code).emit('room:member-joined', player);
+  socket.to(room.code).emit('room:member-joined', {
+    id: player.id, name: player.name, territoryId: player.territoryId
+  });
   publishRoomState(room);
   publishRooms();
   if (room.started) {
-    // 이미 시작한 경기에도 빈 플레이어 슬롯으로 늦게 참가할 수 있습니다.
-    const used = new Set(Object.values(room.spawns || {}).map(point => `${point.x},${point.y}`));
-    const spawn = SPAWN_POINTS.find(point => !used.has(`${point.x},${point.y}`));
-    if (spawn) {
-      room.spawns = room.spawns || {};
-      room.spawns[socket.id] = spawn;
-      socket.emit('game:start', {
-        stageIndex: room.stageIndex,
-        stageNumber: 100 - room.stageIndex,
-        spawns: room.spawns,
-        lateJoin: true
-      });
-    }
+    // 늦게 참가한 이용자도 기존 참가자의 점령 경로를 복원해 같은 맵을 봅니다.
+    const snapshotPlayers = [...room.players.values()]
+      .filter(member => member.id !== socket.id && member.lastState)
+      .map(member => ({
+        ...member.lastState,
+        trail: (member.trail || []).slice(-1800)
+      }));
+    socket.emit('game:map-snapshot', { players: snapshotPlayers });
+
+    // 플레이어별 고정 슬롯을 사용해 스폰 위치와 영토 ID를 일치시킵니다.
+    const spawnIndex = ONLINE_TERRITORY_IDS.indexOf(player.territoryId);
+    const spawn = SPAWN_POINTS[spawnIndex >= 0 ? spawnIndex : 0];
+    room.spawns = room.spawns || {};
+    room.spawns[socket.id] = { ...spawn, territoryId: player.territoryId };
+    socket.emit('game:start', {
+      stageIndex: room.stageIndex,
+      stageNumber: 100 - room.stageIndex,
+      spawns: room.spawns,
+      lateJoin: true
+    });
   } else if (room.autoStartOnJoin && room.players.size >= 1) {
     // 방에 들어온 즉시 온라인 경기를 시작하고, 이후 참가자는 진행 중인 게임에 합류한다.
     startRoomGame(room);
@@ -223,19 +254,29 @@ io.on('connection', socket => {
   socket.on('game:state', state => {
     const code = socketRoom.get(socket.id);
     const room = rooms.get(code);
-    if (!room || !room.started || !state || typeof state !== 'object') return;
+    const player = room?.players.get(socket.id);
+    if (!room || !room.started || !player || !state || typeof state !== 'object') return;
     const safe = {
       id: socket.id,
+      territoryId: player.territoryId,
       x: Number(state.x),
       y: Number(state.y),
       radius: Number(state.radius),
-      name: String(state.name || '아쿠아영웅').slice(0, 12),
+      name: String(state.name || player.name || '아쿠아영웅').slice(0, 12),
       color: String(state.color || '#38bdf8'),
       landColor: String(state.landColor || '#2563eb'),
       stageIndex: Number(state.stageIndex) || 0
     };
     if (![safe.x, safe.y, safe.radius].every(Number.isFinite)) return;
     if (safe.x < 0 || safe.x > 1 || safe.y < 0 || safe.y > 1 || safe.radius < 1 || safe.radius > 200) return;
+
+    // 늦게 입장한 사람에게 공유할 점령 경로를 저장합니다.
+    const previous = player.trail[player.trail.length - 1];
+    if (!previous || Math.hypot(safe.x - previous.x, safe.y - previous.y) >= 0.0035) {
+      player.trail.push({ x: safe.x, y: safe.y, radius: safe.radius });
+      if (player.trail.length > 1800) player.trail.splice(0, player.trail.length - 1800);
+    }
+    player.lastState = safe;
     socket.to(code).emit('game:state', safe);
   });
 
