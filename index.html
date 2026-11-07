@@ -603,7 +603,7 @@
         const COLS = 70;
         const ROWS = 70;
         const TARGET_PERCENT = 40.0;
-        const BOSS_SPEED_RATIO = 0.95;
+        const BOSS_SPEED_RATIO = 0.93;
 
         const LEVEL_CONFIGS = Array.from({ length: 1101 }, (_, i) => {
             const stageNum = 100 - i;
@@ -954,7 +954,7 @@
                 ? cfg.speedMult * 1.65 * speedBoostMult * getAuroraSpeedMultiplier()
                 : cfg.speedMult * 0.92;
             document.getElementById('speed-multiplier-label').innerText = isBossBattle
-                ? `보스 속도 캐릭터보다 5% 낮음 x${(displayedEnemySpeed * BOSS_SPEED_RATIO).toFixed(2)}`
+                ? `보스 속도 캐릭터보다 7% 낮음 x${(displayedEnemySpeed * BOSS_SPEED_RATIO).toFixed(2)}`
                 : `적 이동속도 x${displayedEnemySpeed.toFixed(1)}`;
             updateHud();
 
